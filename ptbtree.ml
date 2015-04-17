@@ -158,4 +158,30 @@ struct
     | Tree.Leaf(p,w) -> Tree.Leaf(Int2StringMap.int2str nt_map p, Int2StringMap.int2str w_map w)
     | Tree.Node(n,l) -> Tree.Node(Int2StringMap.int2str nt_map n, List.map ~f:convert_int_ptb l)
 
+
+  (***********************************)
+  type annotation = {b: int; e: int}
+  type annotated_tree = (int * annotation, int * annotation) Tree.t
+
+  let annotate tree =
+    let rec rec_annotate tree b =
+      match tree with
+      | Tree.Leaf(nt,t) -> Tree.Leaf((nt,(b,b)), (t,(b,b)))
+      | Tree.Node(n,l) ->
+         let e,al =
+           List.fold l
+           ~init:(b,[])
+           ~f:(fun (b',l') tree ->
+             let n = List.length (yield tree) in
+             let tree' = rec_annotate tree b' in
+             (b'+ n), tree'::l'
+           ) in
+         Tree.Node((n,(b,e)),List.rev al)
+    in
+    rec_annotate tree 0
+
+
+
+
+
 end

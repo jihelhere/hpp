@@ -138,9 +138,8 @@ let train =
         let () = Int2StringMap.load_from_sexp Ptbtree.w_map w_map in
         let priors = Rule.priors_of_sexp priors in
         let rules = Rule.gram_of_sexp rules in
-        let grammar = Grammar.initialize Ptbtree.nt_map Ptbtree.w_map rules priors in
-
-        let () = Grammar.parse_file Ptbtree.nt_map Ptbtree.w_map grammar file in
+        let grammar = Grammar.Cky_gram.initialize Ptbtree.nt_map Ptbtree.w_map rules priors in
+        let () = Grammar.CKY.parse_file Ptbtree.w_map grammar file in
         ()
 
 

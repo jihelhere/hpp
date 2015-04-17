@@ -41,9 +41,9 @@ end = struct
 
     let hash t =
       match t with
-      | Bin(l,r1,r2) ->   (Int.hash l) lxor (Int.hash r1) lxor (Int.hash r2)
+      | Bin(l,r1,r2) ->    (Int.hash l) lxor (Int.hash r1) lxor (Int.hash r2)
       | Una(l,r1,_path) -> (Int.hash l) lxor (Int.hash r1) (* and path ??*)
-      | Lex(l,w)  ->      (Int.hash l) lxor (Int.hash w)
+      | Lex(l,w)  ->       (Int.hash l) lxor (Int.hash w)
   end
   include T
   include Hashable.Make(T)
