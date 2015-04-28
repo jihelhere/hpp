@@ -26,6 +26,8 @@ open Int2stringmap
 open Sexp
 
 
+module CKY = Grammar.MakeCKY(Grammar.HistCell(Grammar.CKYBackPointer))
+
 let print_position outx lexbuf =
   let pos = lexbuf.lex_curr_p in
   fprintf outx "%s:%d:%d" pos.pos_fname
@@ -139,7 +141,7 @@ let train =
         let priors = Rule.priors_of_sexp priors in
         let rules = Rule.gram_of_sexp rules in
         let grammar = Grammar.Cky_gram.initialize Ptbtree.nt_map Ptbtree.w_map rules priors in
-        let () = Grammar.CKY.parse_file Ptbtree.w_map grammar file in
+        let () = CKY.parse_file Ptbtree.w_map grammar file in
         ()
 
 

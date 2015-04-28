@@ -139,7 +139,7 @@ struct
 
     let n_nts =Int2StringMap.get_size nt_map in
     let n_ws = Int2StringMap.get_size w_map in
-  (* fprintf Out_channel.stderr "%d non-terminals\t%d terminals\n" n_nts n_ws; *)
+    (* fprintf Out_channel.stderr "%d non-terminals\t%d terminals\n" n_nts n_ws; *)
 
     let gram = empty n_nts n_ws in
     let () = Hashtbl.merge_into ~src:p ~dst: gram.priors ~f:(fun ~key: _ d _ -> Some d)
@@ -174,23 +174,172 @@ end
 
 open Cky_gram
 
-module CKY =
-struct
 
-  type backpointer =
+module type BackPointer =
+sig
+  type t
+
+  val lexical : t
+  val unary : int -> int -> t
+  val binary : int -> int -> int -> int -> t
+end
+
+module type Cell =
+sig
+  type entry
+  type t
+
+  val create_empty : int -> t
+  (* TODO: make these function take a bp intead of last args*)
+  val add_lexical:   t -> int -> float -> Rule.t -> unit
+  val add_unary  :   t -> int -> float -> Rule.t -> int -> unit
+  val add_binary :   t -> int -> float -> Rule.t -> int -> int -> int -> int -> unit
+
+
+  val length : t -> int
+  val get : t -> int -> entry
+  val is_empty_entry : entry -> bool
+  val get_entry_score : entry -> float
+
+  val iteri : t -> f:(int -> entry ->unit) -> unit
+  val add_in_place : t -> t -> unit
+  val prune_priors : t -> (int,float) Hashtbl.t -> threshold:float -> unit
+  val prune_group :  t -> (int,float) Hashtbl.t -> size:int -> unit
+end
+
+module HistCell (BP : BackPointer) : Cell=
+struct
+    type entry = (float * ((Rule.t * BP.t) list)) option
+    type t = entry Array.t
+
+    let empty_entry () = None
+    let create_empty n = Array.init n ~f:(fun _ -> empty_entry ())
+
+    let add_lexical t pos score rule  =
+      let entry = Some(score, [(rule,BP.lexical)]) in
+      Array.unsafe_set t pos entry
+
+    let add (t : t) lhs score rule bp=
+      let rbp = rule, bp in
+      let newval =
+        match Array.unsafe_get t lhs with
+        | None -> Some(score, [rbp])
+        | Some(score', l) -> Some(score +. score', rbp::l)
+      in Array.unsafe_set t lhs newval
+
+    let add_unary  t lhs score rule celli                   = add t lhs score rule (BP.unary celli lhs)
+    let add_binary t lhs score rule lcelli llhs rcelli rlhs = add t lhs score rule (BP.binary lcelli llhs rcelli rlhs)
+
+
+    let length t = Array.length t
+
+
+    let is_empty_entry entry = entry = None
+
+    let get_entry_score entry =
+      match entry with
+        None -> failwith "I get dead"
+      | Some(s,_) -> s
+
+
+    let get t lhs = Array.unsafe_get t lhs
+
+    let iteri t ~f =
+      Array.iteri t ~f
+
+    let add_in_place t other =
+      Array.iteri other
+        ~f:(fun i oentry ->
+          match oentry with
+          | None -> ()
+          | Some(oscore,ohists) ->
+             let new_val =
+               match Array.unsafe_get t i with
+               | None -> oentry
+               | Some(score,hists) -> Some(score +. oscore, List.rev_append ohists hists)
+                      (* Some(score +. uscore, []) *)
+                 in
+                 Array.unsafe_set t i new_val
+            )
+
+
+
+    (* pruning cell inside * priors : and keep the entries >  \alpha max *)
+    let prune_priors t priors ~threshold =
+      let entries2remove =
+        let (entries,max_score) =
+          Array.foldi t ~init:([],0.0)
+            ~f:(fun lhs (acc,max) entry  ->
+              match entry with
+              | None -> (acc,max)
+              | Some (score,_) ->
+                 let tmp = score *. Hashtbl.find_exn priors lhs in
+                 let max' = if tmp > max then tmp else max in
+                     (* fprintf Out_channel.stderr "%f %f %f\n" (score) (Hashtbl.find_exn gram.priors lhs) (score *. Hashtbl.find_exn gram.priors lhs); *)
+                 ((tmp, lhs)::acc,max')
+            )
+        in
+        let max_score = max_score *. threshold in
+        List.filter entries
+          ~f:(fun (score,_) -> score < max_score)
+      in
+      List.iter entries2remove
+        ~f:(fun (_,lhs) ->
+          Array.unsafe_set t lhs None
+        )
+
+
+    (* pruning cell inside * priors : and keep the top 20 ??? *)
+    let prune_group t priors ~size =
+      let entries2remove =
+        Array.foldi t ~init:[]
+          ~f:(fun lhs acc entry  ->
+            match entry with
+            | None -> acc
+            | Some (score,_) ->
+               (* fprintf Out_channel.stderr "%f %f %f\n" (score) (Hashtbl.find_exn gram.priors lhs) (score *. Hashtbl.find_exn gram.priors lhs); *)
+               (score *. Hashtbl.find_exn priors lhs, lhs)::acc
+          )
+      |> List.sort ~cmp: (fun (score1,_) (score2,_) -> Float.compare score2 score1)
+      |> (fun l -> List.drop l size)
+      in
+      List.iter entries2remove
+        ~f:(fun (_,lhs) ->
+          Array.unsafe_set t lhs None
+        )
+end
+
+
+module CKYBackPointer : BackPointer =
+struct
+  type t =
     | N
     | B of int * int * int * int (* left_cell_id * left_nt_id * right_cell_id * right_nt_id *)
     | U of int * int (* cell_id * nt_id *) (* TODO:  cell_id is  redundant *)
 
-  type cell = ((float * ((Rule.t * backpointer) list)) option) Array.t
+  let lexical = N
+  let unary  cell_idx pos =
+    U(cell_idx,pos)
+
+  let binary lcell_idx lpos rcell_idx rpos =
+    B(lcell_idx, lpos, rcell_idx, rpos)
+end
+
+module CKYHistCell = HistCell(CKYBackPointer)
+
+
+
+
+module MakeCKY (Cell : Cell)=
+struct
+
+  type cell = Cell.t
 
   (* type entry = {empty: bool; score:float; hist:(Rule.t * backpointer) list} *)
   (* type cell =  entry Array.t *)
-
   (* let empty_entry () = {empty = true; score = Float.neg_infinity;
      hist = []} *)
-  let empty_entry () = None
-  let empty_cell n = Array.init n ~f:(fun _ -> empty_entry ())
+
 
   let split_regex = Regex.create_exn " +"
 
@@ -207,6 +356,116 @@ struct
   (*   in *)
   (*   iter_size 0 *)
 
+
+  let parse gram tokens =
+
+    let n = Array.length tokens in
+    let access i j = i + ((j-i)*(2*n-(j-i)+ 1))/2 in
+    let size = n*(n+1)/2 in
+
+    (* fprintf Out_channel.stderr "size chart: %d\n%!" size; *)
+    let chart = Array.init size ~f:(fun _ -> Cell.create_empty gram.nts) in
+    (* let () = reinit_chart size gram.nts in *)
+
+
+    (* initialize charts *)
+    Array.iteri tokens
+      ~f:(fun i token ->
+        let cell_i = access i i in
+        let w_id = snd token in
+        let cell = Array.unsafe_get chart cell_i in
+
+        List.iter gram.lex.(w_id)
+          ~f:(fun (pos,prob,rule) ->
+            (* add T -> w *)
+            Cell.add_lexical cell pos prob rule;
+
+            (* add rules L -> T *)
+            List.iter gram.unapos.(pos)
+              ~f:(fun index_ur -> Cell.add_unary cell index_ur.lhs index_ur.score index_ur.rule cell_i)
+          )
+      );
+
+    let process_binaries cell start lend =
+      let rec recprocess_binaries m =
+        if m = lend then ()
+        else
+          let left_cell_id = access start m in
+          let left_cell = Array.unsafe_get chart left_cell_id in
+          let right_cell_id = access (m+1) lend in
+          let right_cell= Array.unsafe_get chart right_cell_id in
+          let () =
+            List.iter gram.bin
+              ~f:(fun (r1,info1) ->
+                let lentry = Cell.get left_cell r1 in
+                if Cell.is_empty_entry lentry then ()
+                else
+                  let left_score = Cell.get_entry_score lentry in
+                  List.iter info1
+                    ~f:(fun (r2,info2) ->
+                      let rentry = Cell.get right_cell r2 in
+                      if Cell.is_empty_entry rentry then ()
+                      else
+                        let right_score = Cell.get_entry_score rentry in
+                        let lr_score = left_score *. right_score in
+                        List.iter  info2
+                          ~f:(fun (lhs,rule_score,rule) ->
+                            let score = lr_score *. rule_score in
+                            Cell.add_binary cell lhs score rule left_cell_id r1 right_cell_id r2
+                          )
+                    )
+              )
+          in
+          recprocess_binaries (m+1)
+      in
+      recprocess_binaries start
+    in
+
+    for width = 1 to n do
+    (* fprintf Out_channel.stderr "width: %d\n%!" width; *)
+      for start = 0 to n-1 do
+        let lend = start + width in
+        if lend < n then
+          let cell_id = (access start lend) in
+          let cell = Array.unsafe_get chart cell_id in
+
+          (* fprintf Out_channel.stderr "cell: %d %d\n%!" start lend; *)
+
+          (* binary rules *)
+          process_binaries cell start lend;
+
+          (*unary rules*)
+          let unary_cell = Cell.create_empty (Cell.length cell) in
+          Cell.iteri cell
+            ~f:(fun i entry ->
+              if Cell.is_empty_entry entry
+              then ()
+              else
+                let score = Cell.get_entry_score entry in
+                 List.iter gram.una.(i)
+                   ~f:(fun unary_index ->
+                     let update_score = score *. unary_index.score in
+                     Cell.add_unary unary_cell unary_index.lhs update_score unary_index.rule i
+                   )
+            );
+
+            Cell.add_in_place cell unary_cell;
+
+            (* Array.iteri cell *)
+            (*   ~f:(fun j entry -> *)
+            (*     match entry with *)
+            (*     | None ->  fprintf Out_channel.stderr "entry %d is empty\n%!" j *)
+            (*     |_ -> fprintf Out_channel.stderr "entry %d is not empty\n%!" j *)
+            (*   ); *)
+
+            (* fprintf Out_channel.stderr "pruning:\n"; *)
+            Cell.prune_priors cell gram.priors ~threshold:0.001
+
+      done;
+    done;
+
+    (* let () = printf "here\n%!" in *)
+    ()
 
   let parse_line w_map gram line =
 
@@ -228,214 +487,10 @@ struct
     (* Array.iteri tokens *)
     (*   ~f:(fun i (str,id) -> *)
     (*     fprintf Out_channel.stderr "token %d %s %d  %s\n%!" i str id (Int2StringMap.int2str w_map id) *)
-    (*   ); *)
+  (*   ); *)
+    parse gram tokens
 
 
-    let n = Array.length tokens in
-    let access i j = i + ((j-i)*(2*n-(j-i)+ 1))/2 in
-    let size = n*(n+1)/2 in
-
-    (* fprintf Out_channel.stderr "size chart: %d\n%!" size; *)
-    let chart = Array.init size ~f:(fun _ -> empty_cell gram.nts) in
-    (* let () = reinit_chart size gram.nts in *)
-
-
-    (* initialize charts *)
-    for i = 0 to (n-1) do
-      let cell_i = access i i in
-      (* fprintf Out_channel.stderr "position is %d -> in chart %d\n%!" i cell_i ; *)
-      let w_id = snd tokens.(i) in
-
-      (* fprintf Out_channel.stderr "token is %d (%s)\n%!" w_id (fst tokens.(i)); *)
-
-      let cell = Array.unsafe_get chart cell_i in
-
-      (* Array.iteri cell *)
-      (*   ~f:(fun j entry -> *)
-      (*     match entry with *)
-      (*     | None ->  fprintf Out_channel.stderr "entry %d is empty\n%!" j *)
-      (*     | match -> _ -> fprintf Out_channel.stderr "entry %d is not empty\n%!" j *)
-      (*   ); *)
-
-
-      List.iter gram.lex.(w_id)
-        ~f:(fun (pos,prob,rule) ->
-
-        let s = Some(prob, [(rule,N)])
-        in
-        (* let s = Some (prob,[]) in *)
-        (* fprintf Out_channel.stderr "pos %d id %d score %f\n%!" i pos prob; *)
-        Array.unsafe_set cell pos s;
-        List.iter gram.unapos.(pos)
-          ~f:(fun {lhs = lhs; score = prob_lhs; rule = rule_lhs} ->
-            let bp = rule_lhs, U(cell_i, pos) in
-            let newval =
-              match Array.unsafe_get cell lhs with
-                | None -> Some(prob_lhs, [bp])
-                | Some(prob', l') -> Some(prob_lhs +. prob', bp::l')
-            in Array.unsafe_set cell lhs newval
-          )
-      )
-    done;
-
-    for width = 1 to n do
-    (* fprintf Out_channel.stderr "width: %d\n%!" width; *)
-      for start = 0 to n-1 do
-        let lend = start + width in
-        if lend < n then
-          let cell_id = (access start lend) in
-          let cell = Array.unsafe_get chart cell_id in
-
-          (* fprintf Out_channel.stderr "cell: %d %d\n%!" start lend; *)
-
-          (* binary rules *)
-          for m = start to lend - 1 do
-
-            let left_cell_id = access start m in
-            let left_cell = Array.unsafe_get chart left_cell_id in
-
-            (*     Array.iteri left_cell *)
-            (* ~f:(fun j entry -> *)
-            (*   match entry with *)
-            (*   | None ->  fprintf Out_channel.stderr "entry %d is empty\n%!" j *)
-            (*   |_ -> fprintf Out_channel.stderr "entry %d is not empty\n%!" j *)
-            (* ); *)
-
-            let right_cell_id = access (m+1) lend in
-            let right_cell= Array.unsafe_get chart right_cell_id in
-
-            (*     Array.iteri right_cell *)
-            (* ~f:(fun j entry -> *)
-            (*   match entry with *)
-            (*   | match ->  None ->  fprintf Out_channel.stderr "entry %d is empty\n%!" j *)
-            (*   |_ -> fprintf Out_channel.stderr "entry %d is not empty\n%!" j *)
-            (* ); *)
-
-
-            List.iter gram.bin
-              ~f:(fun (r1,info1) ->
-                match Array.unsafe_get left_cell r1 with
-                | None -> ()
-                | Some(left_score,_) ->
-                   List.iter info1
-                    ~f:(fun (r2,info2) ->
-                      match Array.unsafe_get right_cell r2 with
-                      | None -> ()
-                      | Some(right_score,_) ->
-                         let lr_score = left_score *. right_score in
-                         List.iter  info2
-                           ~f:(fun (lhs,rule_score,rule) ->
-                             let score = lr_score *. rule_score in
-                             let bp = (rule, B(left_cell_id,r1, right_cell_id, r2)) in
-                             let new_val =
-                               match Array.unsafe_get cell lhs with
-                               | None ->
-                                  Some(score,[bp])
-                                (* Some(score,[]) *)
-                               | Some(score',l') ->
-                                  Some(score +. score', bp::l')
-                              (* Some(score +. score', []) *)
-                             in
-                             Array.unsafe_set cell lhs new_val
-                           )
-                    )
-              )
-
-          done;
-        (* [?  |  ?]et () = printf "here1\n%!" in *)
-          (*unary rules*)
-          let unary_cell = empty_cell (Array.length cell) in
-          Array.iteri cell
-            ~f:(fun i entry ->
-              match entry with
-              | None -> ()
-              |Some(score, _) ->
-                 List.iter gram.una.(i)
-                   ~f:(fun {lhs = lhs; score = rule_score; rule = rule} ->
-                     let update_score = score *. rule_score in
-                   let bp = (rule, U(cell_id, i)) in
-                     let new_val =
-                       match Array.unsafe_get unary_cell lhs with
-                       | None ->
-                          Some (update_score, [bp])
-                          (* some (update_score, []) *)
-                       | Some(score', l) ->
-                          Some(score' +. update_score, bp::l)
-                          (* Some(score' +. update_score, []) *)
-                     in
-                     Array.unsafe_set unary_cell lhs new_val
-                   )
-            );
-
-          Array.iteri unary_cell
-            ~f:( fun i uentry ->
-              match uentry with
-              | None -> ()
-              | Some(uscore,uhists) ->
-                 let new_val =
-                   match Array.unsafe_get cell i with
-                   | None -> uentry
-                   | Some(score,hists) ->
-                      Some(score +. uscore, List.rev_append uhists hists)
-                      (* Some(score +. uscore, []) *)
-                 in
-                 Array.unsafe_set cell i new_val
-            );
-
-    (* Array.iteri cell *)
-    (*   ~f:(fun j entry -> *)
-    (*     match entry with *)
-    (*     | None ->  fprintf Out_channel.stderr "entry %d is empty\n%!" j *)
-    (*     |_ -> fprintf Out_channel.stderr "entry %d is not empty\n%!" j *)
-    (*   ); *)
-
-        (* (\* pruning cell inside * priors : and keep the top 20 ??? *\) *)
-        (* (\* fprintf Out_channel.stderr "pruning:\n"; *\) *)
-        (* let entries2remove = *)
-        (*   Array.foldi cell ~init:[] *)
-        (*     ~f:(fun lhs acc entry  -> *)
-        (*       match entry with *)
-        (*       | None -> acc *)
-        (*       | Some (score,_) -> *)
-        (*          (\* fprintf Out_channel.stderr "%f %f %f\n" (score) (Hashtbl.find_exn gram.priors lhs) (score *. Hashtbl.find_exn gram.priors lhs); *\) *)
-        (*          (score *. Hashtbl.find_exn gram.priors lhs, lhs)::acc *)
-        (*     ) *)
-        (*     |> List.sort ~cmp: (fun (score1,_) (score2,_) -> Float.compare score2 score1) *)
-        (*     |> (fun l -> List.drop l 10) *)
-
-
-          (* pruning cell inside * priors : and keep the entries >
-           \alpha max *)
-          (* fprintf Out_channel.stderr "pruning:\n"; *)
-          let entries2remove =
-            let (entries,max_score) =
-              Array.foldi cell ~init:([],0.0)
-                ~f:(fun lhs (acc,max) entry  ->
-                  match entry with
-                  | None -> (acc,max)
-                  | Some (score,_) ->
-                     let t = score *. Hashtbl.find_exn gram.priors lhs in
-                     let max' = if t > max then t else max in
-                     (* fprintf Out_channel.stderr "%f %f %f\n" (score) (Hashtbl.find_exn gram.priors lhs) (score *. Hashtbl.find_exn gram.priors lhs); *)
-                     ((t, lhs)::acc,max')
-                )
-            in
-            let threshold = 0.0005 in
-            let max_score = max_score *. threshold in
-            List.filter entries
-              ~f:(fun (score,_) -> score < max_score)
-
-          in
-          List.iter entries2remove
-            ~f:(fun (_,lhs) ->
-              Array.unsafe_set cell lhs None
-            )
-
-      done;
-    done;
-
-    (* let () = printf "here\n%!" in *)
-    ()
 
   let parse_file w_map gram file =
 
