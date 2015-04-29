@@ -312,7 +312,6 @@ struct
       (*not sure this avoids copying*)
     Array.fill t ~pos:0 ~len:size (empty_entry ())
 
-
   let transfer_inside t =
     Array.iteri t
       ~f:(fun lhs entry ->
@@ -347,6 +346,7 @@ struct
 (*   ) *)
 
 end
+
 
 
 module BasicCell : Cell=
@@ -561,6 +561,25 @@ struct
       recprocess_binaries start
     in
 
+    (* let process_unary cell = *)
+    (*   let unary_cell = Cell.create_empty (Cell.length cell) in *)
+    (*   let add_to_cell = Cell.add_unary unary_cell *)
+    (*   in *)
+    (*   Cell.iteri cell *)
+    (*     ~f:(fun i entry -> *)
+    (*       if Cell.is_empty_entry entry *)
+    (*       then () *)
+    (*       else *)
+    (*         let score = Cell.get_entry_score entry in *)
+    (*         List.iter gram.una.(i) *)
+    (*           ~f:(fun unary_index -> *)
+    (*             let update_score = score *. unary_index.score in *)
+    (*             add_to_cell unary_index.lhs update_score unary_index.rule i *)
+    (*           ) *)
+    (*     ); *)
+    (*   Cell.add_in_place cell unary_cell *)
+    (* in *)
+
     let process_unary cell =
       Cell.iteri cell
         ~f:(fun rhs entry ->
@@ -580,6 +599,7 @@ struct
 
     let visit_spans sent_length width =
       let rec rec_visit_spans start =
+
         if start = sent_length then ()
         else
           let lend = start + width in
