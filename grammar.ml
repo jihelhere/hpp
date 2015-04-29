@@ -203,10 +203,13 @@ sig
 
   val iteri : t -> f:(int -> entry ->unit) -> unit
   val add_in_place : t -> t -> unit
+  val add_array_in_place : t -> float Array.t -> unit
   val prune_priors : t -> (int,float) Hashtbl.t -> threshold:float -> unit
   val prune_group :  t -> (int,float) Hashtbl.t -> size:int -> unit
 
   val reset : t -> int -> unit
+
+  val stat : int -> int -> t -> unit
 end
 
 module HistCell (BP : BackPointer) : Cell=
@@ -258,11 +261,21 @@ struct
              let new_val =
                match Array.unsafe_get t i with
                | None -> oentry
-               | Some(score,hists) -> Some(score +. oscore, List.rev_append ohists hists)
+               | Some(score,hists) -> Some(score +. oscore, List.unordered_append ohists hists)
                       (* Some(score +. uscore, []) *)
                  in
                  Array.unsafe_set t i new_val
-            )
+        )
+
+
+    let add_array_in_place t array =
+      Array.iteri array
+        ~f:(fun i ascore ->
+          match Array.unsafe_get t i with
+          | None -> ()
+          | Some(score,hists) -> let new_val = Some(score +. ascore, hists) in
+                                 Array.unsafe_set t i new_val
+        )
 
 
 
@@ -276,11 +289,7 @@ struct
               | None -> (acc,max)
               | Some (score,_) ->
                  let tmp = score *. Hashtbl.find_exn priors lhs in
-                 let max' = if tmp > max then tmp else max in
-                     (* fprintf Out_channel.stderr "%f %f %f\n"
-                        (score) (Hashtbl.find_exn gram.priors lhs) (score *.
-                        Hashtbl.find_exn gram.priors lhs); *)
-                 ((tmp, lhs)::acc,max')
+                 let max' = if tmp > max then tmp else max in ((tmp, lhs)::acc,max')
             )
         in
         let max_score = max_score *. threshold in
@@ -317,6 +326,156 @@ struct
       Array.fill t ~pos:0 ~len:size None
 
 
+
+    let stat _s _e _t =
+      ()
+
+
+end
+
+
+
+module HistCell2 (BP : BackPointer) : Cell=
+struct
+  type entry = {init:bool;
+                score:float;
+                uhist: (Rule.t * BP.t) list;
+                bhist: (Rule.t * BP.t) list;
+                lhist: Rule.t option
+               }
+  type t = entry Array.t
+
+  let ventry = {init=false; score=0.0; bhist=[]; lhist=None; uhist=[];}
+  let empty_entry () = {init=false; score=0.0; bhist=[]; lhist=None; uhist=[];}
+  let create_empty n = Array.init n ~f:(fun _ -> empty_entry ())
+
+    let add_lexical t pos score rule  =
+      let entry = {ventry with init =true; score=score; lhist=Some rule} in
+      Array.unsafe_set t pos entry
+
+    let add_unary (t : t) lhs score rule celli =
+      let rbp = rule, (BP.unary celli lhs) in
+      let newval =
+        let oldval = Array.unsafe_get t lhs in
+        if oldval.init then {oldval with score=score +. oldval.score; uhist=rbp::oldval.uhist}
+        else {ventry with init=true;score=score;uhist=[rbp]}
+      in Array.unsafe_set t lhs newval
+
+    let add_binary (t : t) lhs score rule lcelli llhs rcelli rlhs =
+      let rbp = rule, (BP.binary lcelli llhs rcelli rlhs) in
+      let newval =
+        let oldval = Array.unsafe_get t lhs in
+        if oldval.init then {oldval with score=score +. oldval.score; bhist=rbp::oldval.bhist}
+        else {ventry with init=true;score=score;bhist=[rbp]}
+      in Array.unsafe_set t lhs newval
+
+    let length t = Array.length t
+
+
+    let is_empty_entry entry = entry.init = false
+
+    let get_entry_score entry = entry.score
+
+    let get t lhs = Array.unsafe_get t lhs
+
+    let iteri t ~f =
+      Array.iteri t ~f
+
+    let add_in_place t other =
+      Array.iteri other
+        ~f:(fun i ({init=oinit;score=oscore;bhist=obhist;lhist=_;uhist=ouhist} as oentry)->
+          if not oinit then ()
+          else
+            let new_val =
+              let old = Array.unsafe_get t i in
+              if not old.init then oentry
+              else
+                {old with score= old.score +. oscore;
+                  bhist=(List.unordered_append obhist old.bhist);
+                  (*doesn't do anything for lexicals*)
+                  (*lhist=(List.unordered_append olhist old.lhist);*)
+                  uhist=(List.unordered_append ouhist old.uhist);
+                }
+            in
+            Array.unsafe_set t i new_val
+        )
+
+
+    let add_array_in_place t array =
+      Array.iteri array
+        ~f:(fun i ascore ->
+          let old = Array.unsafe_get t i in
+          if not old.init then ()
+          else
+            let new_val = {old with score = old.score +. ascore} in
+            Array.unsafe_set t i new_val
+        )
+
+
+
+    (* pruning cell inside * priors : and keep the entries >  \alpha max *)
+    let prune_priors t priors ~threshold =
+      let (entries,max_score) =
+        Array.foldi t ~init:([],0.0)
+          ~f:(fun lhs (acc,m) entry  ->
+            if not entry.init then (acc,m)
+            else
+              let tmp = entry.score *. Hashtbl.find_exn priors lhs in
+              let max' = max tmp m in
+              ((tmp, lhs)::acc,max')
+          )
+      in
+      let max_score = max_score *. threshold in
+      List.iter entries
+        ~f:(fun (score,lhs) ->
+          if score < max_score then Array.unsafe_set t lhs (ventry)
+        )
+
+
+    (* pruning cell inside * priors : and keep the top ~size ??? *)
+    let prune_group t priors ~size =
+      let entries2remove =
+        Array.foldi t ~init:[]
+          ~f:(fun lhs acc entry  ->
+            if not entry.init then acc
+            else (entry.score *. Hashtbl.find_exn priors lhs, lhs)::acc
+          )
+      |> List.sort ~cmp: (fun (score1,_) (score2,_) -> Float.compare score2 score1)
+      |> (fun l -> List.drop l size)
+      in
+      List.iter entries2remove
+        ~f:(fun (_,lhs) ->
+          Array.unsafe_set t lhs (empty_entry ())
+        )
+
+
+    let reset t size =
+      (*not sure this avoids copying*)
+      Array.fill t ~pos:0 ~len:size (empty_entry ())
+
+    let stat _s _e _t =
+      ()
+      (*  let empty = Array.fold t ~init:true *)
+      (*   ~f:(fun acc entry -> *)
+      (*     if not acc then *)
+      (*       false *)
+      (*     else *)
+      (*       if entry.init then *)
+      (*         false *)
+      (*       else *)
+      (*         true *)
+      (*   ) *)
+      (* in *)
+      (* if empty *)
+      (*   then Printf.printf "cell (%d,%d) is empty\n%!" s e *)
+      (* else *)
+      (* Array.iteri t *)
+      (*   ~f:(fun i entry -> *)
+      (*     if entry.init *)
+      (*     then *)
+      (*       Printf.printf "entry (%d,%d) %d: score %f, hist. length: (%d,%d,%d)\n%!" s e i entry.score (List.length entry.bhist) (List.length entry.lhist) (List.length entry.uhist) *)
+      (*   ) *)
+
 end
 
 
@@ -339,7 +498,7 @@ struct
         | Some score' -> Some (score +. score')
       in Array.unsafe_set t lhs newval
 
-    let add_unary  t lhs score _rule _celli                   = add t lhs score () ()
+    let add_unary  t lhs score _rule _celli                      = add t lhs score () ()
     let add_binary t lhs score _rule _lcelli _llhs _rcelli _rlhs = add t lhs score () ()
 
 
@@ -424,6 +583,22 @@ struct
 
     let reset t size =
       Array.fill t ~pos:0 ~len:size None
+
+    let add_array_in_place t array =
+      Array.iteri array
+        ~f:(fun i ascore ->
+          match Array.unsafe_get t i with
+          | None -> ()
+          | Some score -> let new_val = Some (score +. ascore) in
+                          Array.unsafe_set t i new_val
+        )
+
+
+
+    let stat _s _e _t =
+      ()
+
+
 
 
 end
@@ -549,10 +724,27 @@ struct
       recprocess_binaries start
     in
 
+    (* let process_unary cell = *)
+    (*   let unary_cell = Cell.create_empty (Cell.length cell) in *)
+    (*   let add_to_cell = Cell.add_unary unary_cell *)
+    (*   in *)
+    (*   Cell.iteri cell *)
+    (*     ~f:(fun i entry -> *)
+    (*       if Cell.is_empty_entry entry *)
+    (*       then () *)
+    (*       else *)
+    (*         let score = Cell.get_entry_score entry in *)
+    (*         List.iter gram.una.(i) *)
+    (*           ~f:(fun unary_index -> *)
+    (*             let update_score = score *. unary_index.score in *)
+    (*             add_to_cell unary_index.lhs update_score unary_index.rule i *)
+    (*           ) *)
+    (*     ); *)
+    (*   Cell.add_in_place cell unary_cell *)
+    (* in *)
+
     let process_unary cell =
-      let unary_cell = Cell.create_empty (Cell.length cell) in
-      let add_to_cell = Cell.add_unary unary_cell
-      in
+      let unaries = Array.create ~len:(Cell.length cell) 0.0 in
       Cell.iteri cell
         ~f:(fun i entry ->
           if Cell.is_empty_entry entry
@@ -562,11 +754,14 @@ struct
             List.iter gram.una.(i)
               ~f:(fun unary_index ->
                 let update_score = score *. unary_index.score in
-                add_to_cell unary_index.lhs update_score unary_index.rule i
+                let lhs = unary_index.lhs in
+                Array.unsafe_set unaries lhs ((Array.unsafe_get unaries lhs) +. update_score);
+                Cell.add_unary cell lhs 0.0 unary_index.rule i
               )
         );
-      Cell.add_in_place cell unary_cell
+      Cell.add_array_in_place cell unaries
     in
+
 
       let visit_spans sent_length width =
         let rec rec_visit_spans start =
@@ -576,7 +771,6 @@ struct
           if lend < sent_length then
             let cell_id = (access start lend) in
             let cell = Array.unsafe_get chart cell_id in
-            (* fprintf Out_channel.stderr "cell: %d %d\n%!" start lend; *)
             let () =
               (* binary rules *)
               process_binaries cell start lend;
@@ -585,7 +779,10 @@ struct
               process_unary cell;
 
               (* fprintf Out_channel.stderr "pruning:\n"; *)
-              Cell.prune_priors cell gram.priors ~threshold:0.001
+              Cell.prune_priors cell gram.priors ~threshold:0.001;
+
+              Cell.stat start lend cell
+
             in
             rec_visit_spans (start + 1)
         in

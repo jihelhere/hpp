@@ -26,7 +26,7 @@ open Int2stringmap
 open Sexp
 
 
-module CKY = Grammar.MakeCKY(Grammar.HistCell(Grammar.CKYBackPointer))
+module CKY = Grammar.MakeCKY(Grammar.HistCell2(Grammar.CKYBackPointer))
 (* module CKY = Grammar.MakeCKY(Grammar.BasicCell) *)
 
 let print_position outx lexbuf =
