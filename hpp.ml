@@ -27,6 +27,7 @@ open Sexp
 
 
 module CKY = Grammar.MakeCKY(Grammar.HistCell(Grammar.CKYBackPointer))
+(* module CKY = Grammar.MakeCKY(Grammar.BasicCell) *)
 
 let print_position outx lexbuf =
   let pos = lexbuf.lex_curr_p in
