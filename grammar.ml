@@ -20,94 +20,99 @@ open Rule
 open Int2stringmap
 module Regex = Re2.Regex
 
-(* not really a trie because internal nodes do not have info *)
-(* all paths have the same length *)
-module Rule_trie =
-struct
-  type info = int * float * Rule.t with sexp, compare
-  type t3   = info list with sexp, compare
-  type t2   = (int * t3) list with sexp, compare
-  type t    = (int * t2) list with sexp, compare
-
-  let (empty : t) = []
-
-  let extract_rhs1 bin_rule_score_list =
-    List.map bin_rule_score_list
-      ~f:(fun (bin_rule,_) ->
-        match bin_rule with
-        | Rule.Bin(_,rhs1,_) ->
-           rhs1
-        | _ -> failwith "not a binary rule"
-      )
-  |> List.sort ~cmp:Int.compare
-  |> List.remove_consecutive_duplicates ~equal:Int.equal
-
-
-  let extract_rhs2 bin_rule_score_list =
-    List.map bin_rule_score_list
-      ~f:(fun (bin_rule,_) ->
-        match bin_rule with
-        | Rule.Bin(_,_,rhs2) ->
-           rhs2
-        | _ -> failwith "not a binary rule"
-      )
-  |> List.sort ~cmp:Int.compare
-  |> List.remove_consecutive_duplicates ~equal:Int.equal
-
-
-  let filter_rhs1 my_rhs1 bin_rule_score_list =
-    List.fold bin_rule_score_list
-      ~init:([],[])
-      ~f:(fun (acc_pos,acc_neg) (bin_rule,score) ->
-        match bin_rule with
-        | Rule.Bin(_,rhs1,_) ->
-           if rhs1 = my_rhs1
-           then ((bin_rule,score)::acc_pos, acc_neg)
-           else (acc_pos, (bin_rule,score)::acc_neg)
-        | _ -> failwith "not a binary rule"
-      )
-
-  let filter_rhs2 my_rhs2 bin_rule_score_list =
-    List.fold bin_rule_score_list
-      ~init:([],[])
-      ~f:(fun (acc_pos,acc_neg) (bin_rule,score) ->
-        match bin_rule with
-        | Rule.Bin(_,_,rhs2) ->
-           if rhs2 = my_rhs2
-           then ((bin_rule,score)::acc_pos, acc_neg)
-           else (acc_pos, (bin_rule,score)::acc_neg)
-        | _ -> failwith "not a binary rule"
-      )
-
-  let create bin_rule_score_list =
-    let rhs1s = extract_rhs1 bin_rule_score_list in
-    let (res :t) = List.map rhs1s
-      ~f:(fun rhs1 ->
-        let (rules,_) = filter_rhs1 rhs1 bin_rule_score_list in
-        let rhs2s = extract_rhs2 rules in
-        let (assoc : t2) = List.map rhs2s
-          ~f:(fun rhs2 ->
-            let (rrules,_) = filter_rhs2 rhs2 rules in
-            let (triples : t3) = List.map rrules
-              ~f:(fun (rule,score) ->
-                match rule with
-                | Rule.Bin(lhs,_,_) ->
-                   (lhs,score, rule)
-                | _ -> failwith "not a binary rule"
-              ) in
-            (rhs2,triples)
-          )
-        in
-        rhs1, assoc
-      )
-    in
-    res
-end
 
 
 (* TODO proper initialization *)
 module Cky_gram =
 struct
+
+(* not really a trie because internal nodes do not have info *)
+(* all paths have the same length *)
+  module Rule_trie =
+  struct
+    type info = int * float * Rule.t with sexp, compare
+    type t3   = info list with sexp, compare
+    type t2   = (int * t3) list with sexp, compare
+    type t    = (int * t2) list with sexp, compare
+
+    let (empty : t) = []
+
+    let extract_rhs1 bin_rule_score_list =
+      List.map bin_rule_score_list
+        ~f:(fun (bin_rule,_) ->
+          match bin_rule with
+          | Rule.Bin(_,rhs1,_) ->
+             rhs1
+          | _ -> failwith "not a binary rule"
+        )
+    |> List.sort ~cmp:Int.compare
+    |> List.remove_consecutive_duplicates ~equal:Int.equal
+
+
+    let extract_rhs2 bin_rule_score_list =
+      List.map bin_rule_score_list
+        ~f:(fun (bin_rule,_) ->
+          match bin_rule with
+          | Rule.Bin(_,_,rhs2) ->
+             rhs2
+          | _ -> failwith "not a binary rule"
+        )
+    |> List.sort ~cmp:Int.compare
+    |> List.remove_consecutive_duplicates ~equal:Int.equal
+
+
+    let filter_rhs1 my_rhs1 bin_rule_score_list =
+      List.fold bin_rule_score_list
+        ~init:([],[])
+        ~f:(fun (acc_pos,acc_neg) (bin_rule,score) ->
+          match bin_rule with
+          | Rule.Bin(_,rhs1,_) ->
+             if rhs1 = my_rhs1
+             then ((bin_rule,score)::acc_pos, acc_neg)
+             else (acc_pos, (bin_rule,score)::acc_neg)
+          | _ -> failwith "not a binary rule"
+        )
+
+    let filter_rhs2 my_rhs2 bin_rule_score_list =
+      List.fold bin_rule_score_list
+        ~init:([],[])
+        ~f:(fun (acc_pos,acc_neg) (bin_rule,score) ->
+          match bin_rule with
+          | Rule.Bin(_,_,rhs2) ->
+             if rhs2 = my_rhs2
+             then ((bin_rule,score)::acc_pos, acc_neg)
+             else (acc_pos, (bin_rule,score)::acc_neg)
+          | _ -> failwith "not a binary rule"
+        )
+
+    let create bin_rule_score_list =
+      let rhs1s = extract_rhs1 bin_rule_score_list in
+      let (res :t) = List.map rhs1s
+        ~f:(fun rhs1 ->
+          let (rules,_) = filter_rhs1 rhs1 bin_rule_score_list in
+          let rhs2s = extract_rhs2 rules in
+          let (assoc : t2) = List.map rhs2s
+            ~f:(fun rhs2 ->
+              let (rrules,_) = filter_rhs2 rhs2 rules in
+              let (triples : t3) = List.map rrules
+                ~f:(fun (rule,score) ->
+                  match rule with
+                  | Rule.Bin(lhs,_,_) ->
+                     (lhs,score, rule)
+                  | _ -> failwith "not a binary rule"
+                ) in
+              (rhs2,triples)
+            )
+          in
+          rhs1, assoc
+        )
+      in
+      res
+  end
+
+
+
+
   (* rhs -> lhs * prob * rule *)
   type index = {lhs:int; score:float; rule:Rule.t}
   type unary_index =  (index list) Array.t
@@ -180,8 +185,8 @@ sig
   type t
 
   val lexical : t
-  val unary : int -> int -> t
-  val binary : int -> int -> int -> int -> t
+  val unary   : int -> int -> t
+  val binary  : int -> int -> int -> int -> t
 end
 
 module type Cell =
@@ -190,7 +195,6 @@ sig
   type t
 
   val create_empty : int -> t
-  (* TODO: make these function take a bp intead of last args*)
   val add_lexical:   t -> int -> float -> Rule.t -> unit
   val add_unary  :   t -> int -> float -> Rule.t -> int -> unit
   val add_binary :   t -> int -> float -> Rule.t -> int -> int -> int -> int -> unit
@@ -224,8 +228,10 @@ struct
                }
   type t = entry Array.t
 
-  (* let ventry = {init=false; scores={inside_score=0.0; unary_inside_score=0.0}; bhist=[]; lhist=None; uhist=[];} *)
-  let empty_entry () = {init=false; scores={inside_score=0.0; unary_inside_score=0.0}; bhist=[]; lhist=None; uhist=[];}
+  let empty_entry () = {init=false;
+                        scores={inside_score=0.0; unary_inside_score=0.0};
+                        bhist=[]; lhist=None; uhist=[];
+                       }
   let create_empty n = Array.init n ~f:(fun _ -> empty_entry ())
 
   (* let add_lexical t pos score rule  = *)
@@ -239,7 +245,8 @@ struct
   let add_lexical t pos score rule  =
     let entry = Array.unsafe_get t pos in
     entry.init <- true;
-    entry.scores.inside_score <- score;
+    entry.scores.inside_score <- score
+    ;
     entry.lhist <- Some rule
 
 
@@ -261,7 +268,8 @@ struct
     let entry = Array.unsafe_get t lhs in
     let rbp = rule, (BP.unary celli lhs) in
     entry.init <- true;
-    entry.scores.unary_inside_score <- entry.scores.unary_inside_score +. score;
+    entry.scores.unary_inside_score <- entry.scores.unary_inside_score +. score
+    ;
     entry.uhist <- rbp::entry.uhist
 
 
@@ -280,11 +288,12 @@ struct
 
 
   let add_binary (t : t) lhs score rule lcelli llhs rcelli rlhs =
-  let entry =  Array.unsafe_get t lhs in
-  let rbp = rule, (BP.binary lcelli llhs rcelli rlhs) in
-  entry.init <- true;
-  entry.scores.inside_score <- entry.scores.inside_score +. score;
-  entry.bhist <- rbp::entry.bhist
+    let entry =  Array.unsafe_get t lhs in
+    let rbp = rule, (BP.binary lcelli llhs rcelli rlhs) in
+    entry.init <- true;
+    entry.scores.inside_score <- entry.scores.inside_score +. score
+    ;
+    entry.bhist <- rbp::entry.bhist
 
   let length t = Array.length t
 
@@ -296,8 +305,16 @@ struct
 
   let iteri t ~f = Array.iteri t ~f
 
+  let nb_active t = Array.fold t ~init:0
+    ~f:(fun acc entry ->
+      if entry.init then acc+1 else acc)
+
   (* pruning cell inside * priors : and keep the entries >  \alpha max *)
   let prune_priors t priors ~threshold =
+
+    (* let a1 = Float.of_int(nb_active t) in *)
+
+
     let (entries,max_score) =
       Array.foldi t ~init:([],0.0)
         ~f:(fun lhs (acc,m) entry  ->
@@ -311,9 +328,13 @@ struct
     let max_score = max_score *. threshold in
     List.iter entries
       ~f:(fun (score,lhs) -> if score < max_score then t.(lhs).init <- false)
+  (* ; *)
+  (* let a2 = Float.of_int(nb_active t) in *)
+  (* if a1 <> 0.0 *)
+  (* then  printf "after pruning: %f\n%!"  (100.0 *. a2/. a1) *)
+  (* else  printf "cell was empty\n%!" *)
 
-
-    (* pruning cell inside * priors : and keep the top ~size ??? *)
+  (* pruning cell inside * priors : and keep the top ~size ??? *)
   let prune_group t priors ~size =
     let entries2remove =
       Array.foldi t ~init:[]
@@ -331,7 +352,7 @@ struct
 
 
   let reset t size =
-      (*not sure this avoids copying*)
+    (*not sure this avoids copying*)
     Array.fill t ~pos:0 ~len:size (empty_entry ())
 
   (* let transfer_inside t = *)
@@ -355,29 +376,31 @@ struct
 
 
   let stat s e t =
-    (* () *)
- let empty = Array.fold t ~init:true
-  ~f:(fun acc entry ->
-    if not acc then
-      false
+ (* () *)
+    let empty = Array.fold t ~init:true
+      ~f:(fun acc entry ->
+        if not acc then
+          false
+        else
+          if entry.init then
+            false
+          else
+            true
+      )
+    in
+    if empty
+    then Printf.printf "cell (%d,%d) is empty\n%!" s e
     else
-      if entry.init then
-        false
-      else
-        true
-  )
-in
-if empty
-  then Printf.printf "cell (%d,%d) is empty\n%!" s e
-else
-Array.iteri t
-  ~f:(fun i entry ->
-    if entry.init
-    then
-      Printf.printf "entry (%d,%d) %d: score %f, hist. length: (%d,%d,%d)\n%!"
-        s e i entry.scores.inside_score
-        (List.length entry.bhist) (if entry.lhist = None then 0 else 1) (List.length entry.uhist)
-  )
+      Array.iteri t
+        ~f:(fun i entry ->
+          if entry.init
+          then
+      (* Printf.printf "entry (%d,%d) %d: score %f, hist. length: (%d,%d,%d)\n%!" *)
+      (*   s e i entry.scores.inside_score *)
+      (*   (List.length entry.bhist) (if entry.lhist = None then 0 else 1) (List.length entry.uhist) *)
+            Printf.printf "entry (%d,%d) %d: score %f\n%!"
+              s e i entry.scores.inside_score
+        )
 
 end
 
@@ -421,7 +444,7 @@ struct
   let iteri t ~f =
     Array.iteri t ~f
 
-    (* pruning cell inside * priors : and keep the entries >  \alpha max *)
+  (* pruning cell inside * priors : and keep the entries >  \alpha max *)
   let prune_priors t priors ~threshold =
     let entries2remove =
       let (entries,max_score) =
@@ -432,9 +455,9 @@ struct
             | Some score ->
                let tmp = score *. Hashtbl.find_exn priors lhs in
                let max' = if tmp > max then tmp else max in
-                 (* fprintf Out_channel.stderr "%f %f %f\n"
-                    (score) (Hashtbl.find_exn gram.priors lhs) (score *.
-                    Hashtbl.find_exn gram.priors lhs); *)
+               (* fprintf Out_channel.stderr "%f %f %f\n"
+                  (score) (Hashtbl.find_exn gram.priors lhs) (score *.
+                  Hashtbl.find_exn gram.priors lhs); *)
                ((tmp, lhs)::acc,max')
           )
       in
@@ -448,7 +471,7 @@ struct
       )
 
 
-    (* pruning cell inside * priors : and keep the top 20 ??? *)
+  (* pruning cell inside * priors : and keep the top 20 ??? *)
   let prune_group t priors ~size =
     let entries2remove =
       Array.foldi t ~init:[]
@@ -456,7 +479,7 @@ struct
           match entry with
           | None -> acc
           | Some score ->
-               (* fprintf Out_channel.stderr "%f %f %f\n" (score) (Hashtbl.find_exn gram.priors lhs) (score *. Hashtbl.find_exn gram.priors lhs); *)
+             (* fprintf Out_channel.stderr "%f %f %f\n" (score) (Hashtbl.find_exn gram.priors lhs) (score *. Hashtbl.find_exn gram.priors lhs); *)
              (score *. Hashtbl.find_exn priors lhs, lhs)::acc
         )
     |> List.sort ~cmp: (fun (score1,_) (score2,_) -> Float.compare score2 score1)
@@ -650,8 +673,8 @@ struct
               (* fprintf Out_channel.stderr "pruning:\n"; *)
               Cell.prune_priors cell gram.priors ~threshold:0.001
 
-              (* ; *)
-              (* Cell.stat start lend cell *)
+            (* ; *)
+            (* Cell.stat start lend cell *)
 
             in
             rec_visit_spans (start + 1)

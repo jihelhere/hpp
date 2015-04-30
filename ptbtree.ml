@@ -180,8 +180,4 @@ struct
     in
     rec_annotate tree 0
 
-
-
-
-
 end

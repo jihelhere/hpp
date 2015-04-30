@@ -17,10 +17,9 @@
 
 open Core.Std
 
-open Lexer
-open Lexing
-
 open Ptbtree
+open Treebank
+
 open Rule
 open Int2stringmap
 open Sexp
@@ -29,41 +28,6 @@ open Sexp
 module CKY = Grammar.MakeCKY(Grammar.HistCell(Grammar.CKYBackPointer))
 (* module CKY = Grammar.MakeCKY(Grammar.BasicCell) *)
 
-let print_position outx lexbuf =
-  let pos = lexbuf.lex_curr_p in
-  fprintf outx "%s:%d:%d" pos.pos_fname
-    pos.pos_lnum (pos.pos_cnum - pos.pos_bol + 1)
-
-let parse_with_error lexbuf =
-  try Ptbparser.treel Lexer.read lexbuf with
-  | SyntaxError msg ->
-    fprintf stderr "%a: %s\n" print_position lexbuf msg;
-    []
-  | Ptbparser.Error ->
-    fprintf stderr "%a: syntax error\n" print_position lexbuf;
-    exit (-1)
-
-
-let parse_and_print lexbuf =
-  match parse_with_error lexbuf with
-  | [] -> []
-  | l ->
-     let () = fprintf Out_channel.stderr "Successful Parse: %d trees\n%!" (List.length l) in
-     l
-
-
-let loop filename =
-  let inx = In_channel.create filename in
-  let lexbuf = Lexing.from_channel inx in
-  lexbuf.lex_curr_p <- { lexbuf.lex_curr_p with pos_fname = filename };
-  let l = parse_and_print lexbuf in
-  let () = In_channel.close inx in
-  l
-
-
-let read_treebank filename =
-  let tree_list = loop filename |> List.map ~f:Ptbtree.process_tree in
-  tree_list
 
 let train =
   Command.basic
@@ -88,23 +52,7 @@ let train =
        verbose
       () ->
 
-
-        let () = if verbose then fprintf Out_channel.stderr "read treebank\n%!"  in
-        let l = read_treebank train_filename in
-        (* let () = List.iter l ~f:(fun t -> printf "%s\n%!" (Ptbtree.to_string t)) in *)
-
-        let () = if verbose then fprintf Out_channel.stderr "mask rare token\n%!"  in
-        let l' = Ptbtree.replace_rares_simple 5 l in
-        (* let () = List.iter l' ~f:(fun t -> printf "%s\n%!" (Ptbtree.to_string t)) in *)
-
-        let () = if verbose then fprintf Out_channel.stderr "encode strings\n%!"  in
-        let il = List.map ~f:Ptbtree.convert_string_ptb l' in
-        (* let l'' = List.map ~f:Ptbtree.convert_int_ptb il in *)
-        (* let () = List.iter l'' ~f:(fun t -> printf "%s\n%!"
-           (Ptbtree.to_string t)) in *)
-
-        let () = if verbose then fprintf Out_channel.stderr "compute pcfg weights/priors\n%!"  in
-        let priors, hgram = Rule.create_pcfg il in
+        let priors, hgram = Treebank.process_file verbose train_filename 5 in
 
         let () = if verbose then fprintf Out_channel.stderr "save to file\n%!"  in
         let priors_sexp = Hashtbl.sexp_of_t (Int.sexp_of_t) (Float.sexp_of_t) priors in
@@ -144,19 +92,22 @@ let train =
         let grammar = Grammar.Cky_gram.initialize Ptbtree.nt_map Ptbtree.w_map rules priors in
         let () = CKY.parse_file Ptbtree.w_map grammar file in
         ()
-
-
-
     )
 
 
 
-let command =
-  Command.group
-    ~summary:"HP parser"
-    ~readme:(fun () -> "More detailed information")
-    [("train",train); ("parse",parse)]
+    let command =
+      let c = Gc.get () in
+      let () = printf "minor heap size before : %d \n%!" c.minor_heap_size in
+      let () = Gc.tune ~minor_heap_size:(262144 * 32) () in
+      let c = Gc.get () in
+      let () = printf "minor heap size after : %d \n%!" c.minor_heap_size in
+      let () = Gc.tune ~major_heap_increment:(1000448 * 8) () in
+      Command.group
+        ~summary:"HP parser"
+        ~readme:(fun () -> "More detailed information")
+        [("train",train); ("parse",parse)]
 
-let () = Command.run
-           ~version:"0.0.1" ~build_info:"JLR"
-           command
+    let () = Command.run
+      ~version:"0.0.1" ~build_info:"JLR"
+      command
