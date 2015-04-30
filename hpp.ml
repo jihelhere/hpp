@@ -25,8 +25,7 @@ open Int2stringmap
 open Sexp
 
 
-module CKY = Grammar.MakeCKY(Grammar.HistCell(Grammar.CKYBackPointer))
-(* module CKY = Grammar.MakeCKY(Grammar.BasicCell) *)
+module CKY = Grammar.MakeCKY(Grammar.BaseCell)
 
 
 let train =
@@ -97,12 +96,12 @@ let train =
 
 
     let command =
-      let c = Gc.get () in
-      let () = printf "minor heap size before : %d \n%!" c.minor_heap_size in
-      let () = Gc.tune ~minor_heap_size:(262144 * 32) () in
-      let c = Gc.get () in
-      let () = printf "minor heap size after : %d \n%!" c.minor_heap_size in
-      let () = Gc.tune ~major_heap_increment:(1000448 * 8) () in
+      (* let c = Gc.get () in *)
+      (* let () = printf "minor heap size before : %d \n%!" c.minor_heap_size in *)
+      (* let () = Gc.tune ~minor_heap_size:(262144 * 32) () in *)
+      (* let c = Gc.get () in *)
+      (* let () = printf "minor heap size after : %d \n%!" c.minor_heap_size in *)
+      (* let () = Gc.tune ~major_heap_increment:(1000448 * 8) () in *)
       Command.group
         ~summary:"HP parser"
         ~readme:(fun () -> "More detailed information")
