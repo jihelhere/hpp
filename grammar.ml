@@ -214,53 +214,79 @@ end
 
 module HistCell (BP : BackPointer) : Cell=
 struct
-  type scores = {inside_score:float; unary_inside_score:float}
-  type entry = {init:bool;
-                scores:scores;
-                uhist: (Rule.t * BP.t) list;
-                bhist: (Rule.t * BP.t) list;
-                lhist: Rule.t option
+  type scores = {mutable inside_score:float;
+                 mutable unary_inside_score:float}
+  type entry = {mutable init:bool;
+                mutable scores:scores;
+                mutable uhist: (Rule.t * BP.t) list;
+                mutable bhist: (Rule.t * BP.t) list;
+                mutable lhist: Rule.t option
                }
   type t = entry Array.t
 
-  let vscores = {inside_score=0.0; unary_inside_score=0.0}
-  let ventry = {init=false; scores=vscores; bhist=[]; lhist=None; uhist=[];}
-  let empty_entry () = {init=false; scores=vscores; bhist=[]; lhist=None; uhist=[];}
+  (* let ventry = {init=false; scores={inside_score=0.0; unary_inside_score=0.0}; bhist=[]; lhist=None; uhist=[];} *)
+  let empty_entry () = {init=false; scores={inside_score=0.0; unary_inside_score=0.0}; bhist=[]; lhist=None; uhist=[];}
   let create_empty n = Array.init n ~f:(fun _ -> empty_entry ())
 
+  (* let add_lexical t pos score rule  = *)
+  (*   let entry = {ventry with *)
+  (*     init =true; *)
+  (*     scores = {vscores with inside_score=score}; *)
+  (*     lhist=Some rule} in *)
+  (*   Array.unsafe_set t pos entry *)
+
+
   let add_lexical t pos score rule  =
-    let entry = {ventry with init =true; scores = {vscores with inside_score=score}; lhist=Some rule} in
-    Array.unsafe_set t pos entry
+    let entry = Array.unsafe_get t pos in
+    entry.init <- true;
+    entry.scores.inside_score <- score;
+    entry.lhist <- Some rule
+
+
+  (* let add_unary (t : t) lhs score rule celli = *)
+  (*   let rbp = rule, (BP.unary celli lhs) in *)
+  (*   let newval = *)
+  (*     let oldval = Array.unsafe_get t lhs in *)
+  (*     if oldval.init then {oldval with *)
+  (*       scores={oldval.scores with unary_inside_score=oldval.scores.unary_inside_score +. score}; *)
+  (*       uhist=rbp::oldval.uhist} *)
+  (*     else {ventry with *)
+  (*       init=true; *)
+  (*       scores={inside_score=oldval.scores.inside_score; unary_inside_score=score}; *)
+  (*       uhist=[rbp]} *)
+  (*   in Array.unsafe_set t lhs newval *)
+
 
   let add_unary (t : t) lhs score rule celli =
+    let entry = Array.unsafe_get t lhs in
     let rbp = rule, (BP.unary celli lhs) in
-    let newval =
-      let oldval = Array.unsafe_get t lhs in
-      if oldval.init then {oldval with
-        scores={oldval.scores with unary_inside_score=oldval.scores.unary_inside_score +. score};
-        uhist=rbp::oldval.uhist}
-      else {ventry with
-        init=true;
-        scores={vscores with unary_inside_score=score};
-        uhist=[rbp]}
-    in Array.unsafe_set t lhs newval
+    entry.init <- true;
+    entry.scores.unary_inside_score <- entry.scores.unary_inside_score +. score;
+    entry.uhist <- rbp::entry.uhist
+
+
+  (* let add_binary (t : t) lhs score rule lcelli llhs rcelli rlhs = *)
+  (*   let rbp = rule, (BP.binary lcelli llhs rcelli rlhs) in *)
+  (*   let newval = *)
+  (*     let oldval = Array.unsafe_get t lhs in *)
+  (*     if oldval.init then {oldval with *)
+  (*       scores={oldval.scores with inside_score=score +. oldval.scores.inside_score}; *)
+  (*       bhist=rbp::oldval.bhist} *)
+  (*     else {ventry with *)
+  (*       init=true; *)
+  (*       scores={inside_score=score; unary_inside_score=oldval.scores.unary_inside_score}; *)
+  (*       bhist=[rbp]} *)
+  (*   in Array.unsafe_set t lhs newval *)
+
 
   let add_binary (t : t) lhs score rule lcelli llhs rcelli rlhs =
-    let rbp = rule, (BP.binary lcelli llhs rcelli rlhs) in
-    let newval =
-      let oldval = Array.unsafe_get t lhs in
-      if oldval.init then {oldval with
-        scores={oldval.scores with inside_score=score +. oldval.scores.inside_score};
-        bhist=rbp::oldval.bhist}
-      else {ventry with
-        init=true;
-        scores={vscores with inside_score=score};
-        bhist=[rbp]}
-    in Array.unsafe_set t lhs newval
-
+  let entry =  Array.unsafe_get t lhs in
+  let rbp = rule, (BP.binary lcelli llhs rcelli rlhs) in
+  entry.init <- true;
+  entry.scores.inside_score <- entry.scores.inside_score +. score;
+  entry.bhist <- rbp::entry.bhist
 
   let length t = Array.length t
-
 
   let is_empty_entry entry = entry.init = false
 
@@ -268,11 +294,9 @@ struct
 
   let get t lhs = Array.unsafe_get t lhs
 
-  let iteri t ~f =
-    Array.iteri t ~f
+  let iteri t ~f = Array.iteri t ~f
 
-
-    (* pruning cell inside * priors : and keep the entries >  \alpha max *)
+  (* pruning cell inside * priors : and keep the entries >  \alpha max *)
   let prune_priors t priors ~threshold =
     let (entries,max_score) =
       Array.foldi t ~init:([],0.0)
@@ -286,9 +310,7 @@ struct
     in
     let max_score = max_score *. threshold in
     List.iter entries
-      ~f:(fun (score,lhs) ->
-        if score < max_score then Array.unsafe_set t lhs (ventry)
-      )
+      ~f:(fun (score,lhs) -> if score < max_score then t.(lhs).init <- false)
 
 
     (* pruning cell inside * priors : and keep the top ~size ??? *)
@@ -312,38 +334,50 @@ struct
       (*not sure this avoids copying*)
     Array.fill t ~pos:0 ~len:size (empty_entry ())
 
+  (* let transfer_inside t = *)
+  (*   Array.iteri t *)
+  (*     ~f:(fun lhs entry -> *)
+  (*       if entry.init *)
+  (*       then *)
+  (*         Array.unsafe_set t lhs {entry with scores={inside_score=entry.scores.inside_score +. entry.scores.unary_inside_score; *)
+  (*                                                    unary_inside_score = 0.0}} *)
+  (*     ) *)
+
+
   let transfer_inside t =
-    Array.iteri t
-      ~f:(fun lhs entry ->
+    Array.iter t
+      ~f:(fun entry ->
         if entry.init
         then
-          Array.unsafe_set t lhs {entry with scores={inside_score=entry.scores.inside_score +. entry.scores.unary_inside_score;
-                                                     unary_inside_score = 0.0}}
+          (entry.scores.inside_score <-entry.scores.inside_score +. entry.scores.unary_inside_score;
+           entry.scores.unary_inside_score <- 0.0)
       )
 
 
-  let stat _s _e _t =
-    ()
-(*  let empty = Array.fold t ~init:true *)
-(*   ~f:(fun acc entry -> *)
-(*     if not acc then *)
-(*       false *)
-(*     else *)
-(*       if entry.init then *)
-(*         false *)
-(*       else *)
-(*         true *)
-(*   ) *)
-(* in *)
-(* if empty *)
-(*   then Printf.printf "cell (%d,%d) is empty\n%!" s e *)
-(* else *)
-(* Array.iteri t *)
-(*   ~f:(fun i entry -> *)
-(*     if entry.init *)
-(*     then *)
-(*       Printf.printf "entry (%d,%d) %d: score %f, hist. length: (%d,%d,%d)\n%!" s e i entry.score (List.length entry.bhist) (List.length entry.lhist) (List.length entry.uhist) *)
-(*   ) *)
+  let stat s e t =
+    (* () *)
+ let empty = Array.fold t ~init:true
+  ~f:(fun acc entry ->
+    if not acc then
+      false
+    else
+      if entry.init then
+        false
+      else
+        true
+  )
+in
+if empty
+  then Printf.printf "cell (%d,%d) is empty\n%!" s e
+else
+Array.iteri t
+  ~f:(fun i entry ->
+    if entry.init
+    then
+      Printf.printf "entry (%d,%d) %d: score %f, hist. length: (%d,%d,%d)\n%!"
+        s e i entry.scores.inside_score
+        (List.length entry.bhist) (if entry.lhist = None then 0 else 1) (List.length entry.uhist)
+  )
 
 end
 
@@ -614,9 +648,10 @@ struct
               process_unary cell;
 
               (* fprintf Out_channel.stderr "pruning:\n"; *)
-              Cell.prune_priors cell gram.priors ~threshold:0.001;
+              Cell.prune_priors cell gram.priors ~threshold:0.001
 
-              Cell.stat start lend cell
+              (* ; *)
+              (* Cell.stat start lend cell *)
 
             in
             rec_visit_spans (start + 1)
