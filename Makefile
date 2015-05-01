@@ -1,5 +1,7 @@
 
-SOURCES= hpp.ml ptbparser.mly lexer.mll ptbtree.ml tree.ml rule.ml grammar.ml treebank.ml
+SOURCES= hpp.ml ptbparser.mly lexer.mll ptbtree.ml tree.ml \
+rule.ml rule.mli cky.ml treebank.ml treebank.mli \
+ckygram.ml ckygram.mli
 
 all: hpp.native hpp.byte
 

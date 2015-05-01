@@ -148,15 +148,28 @@ struct
   let nt_map = Int2StringMap.empty ()
   let w_map =  Int2StringMap.empty ()
 
-  let rec convert_string_ptb t =
+  let rec convert_string_tree t =
     match t with
     | Tree.Leaf(p,w) -> Tree.Leaf(Int2StringMap.str2int nt_map p, Int2StringMap.str2int w_map w)
-    | Tree.Node(n,l) -> Tree.Node(Int2StringMap.str2int nt_map n, List.map ~f:convert_string_ptb l)
+    | Tree.Node(n,l) -> Tree.Node(Int2StringMap.str2int nt_map n, List.map ~f:convert_string_tree l)
 
-  let rec convert_int_ptb t =
+  let rec convert_string_yield t =
+    match t with
+    | Tree.Leaf(p,w) -> ignore(Int2StringMap.str2int nt_map p); ignore(Int2StringMap.str2int w_map w)
+    | Tree.Node(_,l) -> List.iter ~f:convert_string_yield l
+
+  let rec convert_int_tree t =
     match t with
     | Tree.Leaf(p,w) -> Tree.Leaf(Int2StringMap.int2str nt_map p, Int2StringMap.int2str w_map w)
-    | Tree.Node(n,l) -> Tree.Node(Int2StringMap.int2str nt_map n, List.map ~f:convert_int_ptb l)
+    | Tree.Node(n,l) -> Tree.Node(Int2StringMap.int2str nt_map n, List.map ~f:convert_int_tree l)
+
+
+  let convert_string_trees l =
+    (* List.iter ~f:convert_string_yield l; *)
+    (* let nb_pos = Int2StringMap.get_size nt_map in *)
+    (* let l' = List.map  ~f:convert_string_tree l in *)
+    (* nb_pos,l' *)
+    -1, List.map  ~f:convert_string_tree l
 
 
   (***********************************)

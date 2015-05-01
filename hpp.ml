@@ -24,7 +24,6 @@ open Rule
 open Int2stringmap
 open Sexp
 
-
 module CKY = Grammar.MakeCKY(Grammar.BaseCell)
 
 
@@ -32,81 +31,68 @@ let train =
   Command.basic
     ~summary:"Train and eval hpp"
     Command.Spec.
-  (
-    empty
-    +> flag "-t" (required file) ~doc: "filename Training set    (PTBformat)"
-    (* +> flag "-d" (optional file) ~doc: "filename Development set (PTB format)" *)
-    (* +> flag "-f" (optional file) ~doc: "filename Test set        (PTB format)" *)
-    (* +> flag "-i" (optional_with_default 10 int)  ~doc: "int Iterations" *)
-    (* +> flag "-n" (optional_with_default 5 int)  ~doc: "int Feature threshold" *)
-    +> flag "-m" (required file) ~doc: "filename Output model name"
-    (* +> flag "-a" (optional_with_default "mira" string) ~doc: "string Trainer name : \"perceptron\" or \"mira\" [default]" *)
-    +> flag "-v" (no_arg) ~doc: " Verbose mode"
-  )
+    (
+      empty
+      +> flag "-t" (required file) ~doc: "filename Training set    (PTBformat)"
+      (* +> flag "-d" (optional file) ~doc: "filename Development set (PTB format)" *)
+      (* +> flag "-f" (optional file) ~doc: "filename Test set        (PTB format)" *)
+      (* +> flag "-i" (optional_with_default 10 int)  ~doc: "int Iterations" *)
+      (* +> flag "-n" (optional_with_default 5 int)  ~doc: "int Feature threshold" *)
+      +> flag "-m" (required file) ~doc: "filename Output model name"
+      (* +> flag "-a" (optional_with_default "mira" string) ~doc: "string Trainer name : \"perceptron\" or \"mira\" [default]" *)
+      +> flag "-v" (no_arg) ~doc: " Verbose mode"
+    )
     (fun train_filename
       (* dev_filename test_filename *)
       (* max_iter feature_threshold *)
       model
-      (* algo *)
-       verbose
+       (* algo *)
+      verbose
       () ->
 
-        let priors, hgram = Treebank.process_file verbose train_filename 5 in
-
+        let _nb_pos,priors, hgram = Treebank.process_file verbose train_filename 5 in
         let () = if verbose then fprintf Out_channel.stderr "save to file\n%!"  in
         let priors_sexp = Hashtbl.sexp_of_t (Int.sexp_of_t) (Float.sexp_of_t) priors in
         let hgram_sexp = Hashtbl.sexp_of_t (Rule.sexp_of_t) (Float.sexp_of_t) hgram in
-        let sexp = Sexp.List [Int2StringMap.sexp_of_t Ptbtree.nt_map; Int2StringMap.sexp_of_t Ptbtree.w_map; priors_sexp; hgram_sexp] in
+        let sexp = Sexp.List
+          [Int2StringMap.sexp_of_t Ptbtree.nt_map; Int2StringMap.sexp_of_t Ptbtree.w_map; priors_sexp; hgram_sexp] in
         Sexp.save_hum model sexp
     )
 
-
-
-
-    let parse =
+let parse =
   Command.basic
     ~summary:"Parse with hpp"
     Command.Spec.
-  (
-    empty
-    +> flag "-f" (required file) ~doc: "filename Test set (tok format)" (* TODO:  make it optional and able to read stdin *)
-    +> flag "-m" (required file) ~doc: "filename Model name"
-    +> flag "-v" (no_arg) ~doc: " Verbose mode"
-  )
+    (
+      empty
+      +> flag "-f" (required file) ~doc: "filename Test set (tok format)" (* TODO:  make it optional and able to read stdin *)
+      +> flag "-m" (required file) ~doc: "filename Model name"
+      +> flag "-v" (no_arg) ~doc: " Verbose mode"
+    )
     (fun file
       model
-       verbose
+      verbose
       () ->
 
-        let () = if verbose then fprintf Out_channel.stderr "loading model\n%!"  in
-        let (nt_map, w_map, priors, rules) =
-        match Sexp.load_sexp model with
-        | Sexp.List([n;w;p;g]) -> (n,w,p,g)
-        | _ -> failwith "unable to load model"
-        in
-        let () = Int2StringMap.load_from_sexp Ptbtree.nt_map nt_map in
-        let () = Int2StringMap.load_from_sexp Ptbtree.w_map w_map in
-        let priors = Rule.priors_of_sexp priors in
-        let rules = Rule.gram_of_sexp rules in
-        let grammar = Grammar.Cky_gram.initialize Ptbtree.nt_map Ptbtree.w_map rules priors in
-        let () = CKY.parse_file Ptbtree.w_map grammar file in
+        let grammar = Ckygram.from_model_file verbose model in
+        let () = CKY.parse_file grammar file in
         ()
     )
 
 
 
-    let command =
+let command =
       (* let c = Gc.get () in *)
       (* let () = printf "minor heap size before : %d \n%!" c.minor_heap_size in *)
       (* let () = Gc.tune ~minor_heap_size:(262144 * 32) () in *)
       (* let c = Gc.get () in *)
       (* let () = printf "minor heap size after : %d \n%!" c.minor_heap_size in *)
       (* let () = Gc.tune ~major_heap_increment:(1000448 * 8) () in *)
-      Command.group
-        ~summary:"HP parser"
-        ~readme:(fun () -> "More detailed information")
-        [("train",train); ("parse",parse)]
+  Command.group
+    ~summary:"HP parser"
+    ~readme:(fun () -> "More detailed information")
+    [("train",train); ("parse",parse)]
 
-    let () = Command.run
-      ~version:"0.0.1" ~build_info:"JLR"
-      command
+let () = Command.run
+  ~version:"0.0.1" ~build_info:"JLR"
+  command
