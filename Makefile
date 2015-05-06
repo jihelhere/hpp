@@ -1,21 +1,27 @@
-SOURCES= parser/hpp.ml utils/ptbparser.mly utils/lexer.mll parser/ptbtree.ml parser/tree.ml \
+PSOURCES= parser/hpp.ml utils/ptbparser.mly utils/lexer.mll parser/ptbtree.ml parser/tree.ml \
 parser/rule.ml parser/rule.mli parser/cky.ml parser/cky.mli parser/treebank.ml parser/treebank.mli \
 parser/ckygram.ml parser/ckygram.mli \
 parser/backpointer.ml parser/backpointer.mli
 
-all: hpp.native hpp.byte
+TSOURCES= tagger/hpt.ml tagger/conlltag.ml tagger/conlltag.mli
 
-hpp.native: $(SOURCES)
+all: hpp.native hpt.native
+
+hpp.native: $(PSOURCES)
 	corebuild -use-menhir -package re2 parser/hpp.native
 
 
-hpp.byte: $(SOURCES)
+hpt.native: $(TSOURCES)
+	corebuild -use-menhir -package re2 tagger/hpt.native
+
+
+hpp.byte: $(PSOURCES)
 	corebuild -use-menhir -package re2 parser/hpp.byte
 
 clean:
 	-rm -rf _build
-	-rm hpp.native
-	-rm hpp.byte
+	-rm *.native
+	-rm *.byte
 
 
 utop: hpp.byte
