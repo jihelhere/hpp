@@ -15,6 +15,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *)
 
+
 open Core.Std
 module Regex = Re2.Regex
 
@@ -170,9 +171,9 @@ struct
 
   let iteri t ~f = Array.iteri t ~f
 
-  let nb_active t = Array.fold t ~init:0
-    ~f:(fun acc entry ->
-      if entry <> None then acc+1 else acc)
+  (* let nb_active t = Array.fold t ~init:0 *)
+  (*   ~f:(fun acc entry -> *)
+  (*     if entry <> None then acc+1 else acc) *)
 
   (* pruning cell inside * priors : and keep the entries >  \alpha max *)
   let prune_priors t priors ~threshold =
@@ -299,7 +300,7 @@ struct
          begin
            (* printf "%d\n%!" entry_idx; *)
          match CKYBackPointer.get_adress_list bp entry_idx with
-         | Rule.Lex(pos,w),[tok_id] ->
+         | Rule.Lex(pos,_),[tok_id] ->
             begin match tokens.(tok_id) with (w,_,_) ->
               (* printf "lexical %s\n%!" w; *)
               Tree.Leaf(Int2StringMap.int2str (Ckygram.nt_map gram) pos, w) end
