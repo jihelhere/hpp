@@ -47,6 +47,7 @@ val binary_index : t -> Rule_trie.t
 
 val priors : t -> (int,float) Hashtbl.t
 val word_map : t -> Int2StringMap.t
+val nt_map : t -> Int2StringMap.t
 
 
 val from_model_file : bool -> string -> t

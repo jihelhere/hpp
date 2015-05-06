@@ -209,3 +209,4 @@ module Rule_trie =
 
   let priors t = t.priors
   let word_map t = t.w_map
+  let nt_map t = t.nt_map

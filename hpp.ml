@@ -24,7 +24,7 @@ open Rule
 open Int2stringmap
 open Sexp
 
-module CKY = Grammar.MakeCKY(Grammar.BaseCell)
+module CKY = Cky.MakeCKY(Cky.BaseCell)
 
 
 let train =
@@ -34,7 +34,7 @@ let train =
     (
       empty
       +> flag "-t" (required file) ~doc: "filename Training set    (PTBformat)"
-      (* +> flag "-d" (optional file) ~doc: "filename Development set (PTB format)" *)
+      +> flag "-d" (optional file) ~doc: "filename Development set (PTB format)"
       (* +> flag "-f" (optional file) ~doc: "filename Test set        (PTB format)" *)
       (* +> flag "-i" (optional_with_default 10 int)  ~doc: "int Iterations" *)
       (* +> flag "-n" (optional_with_default 5 int)  ~doc: "int Feature threshold" *)
@@ -43,20 +43,39 @@ let train =
       +> flag "-v" (no_arg) ~doc: " Verbose mode"
     )
     (fun train_filename
-      (* dev_filename test_filename *)
+      dev_filename
+      (* test_filename *)
       (* max_iter feature_threshold *)
       model
        (* algo *)
       verbose
       () ->
 
-        let _nb_pos,priors, hgram = Treebank.process_file verbose train_filename 5 in
-        let () = if verbose then fprintf Out_channel.stderr "save to file\n%!"  in
-        let priors_sexp = Hashtbl.sexp_of_t (Int.sexp_of_t) (Float.sexp_of_t) priors in
-        let hgram_sexp = Hashtbl.sexp_of_t (Rule.sexp_of_t) (Float.sexp_of_t) hgram in
-        let sexp = Sexp.List
-          [Int2StringMap.sexp_of_t Ptbtree.nt_map; Int2StringMap.sexp_of_t Ptbtree.w_map; priors_sexp; hgram_sexp] in
-        Sexp.save_hum model sexp
+        (* build simple statistics*)
+        let _string_trees =
+          let train_string_trees,priors, hgram = Treebank.process_file verbose train_filename 5 in
+          let () = if verbose then fprintf Out_channel.stderr "save to file\n%!"  in
+          let priors_sexp = Hashtbl.sexp_of_t (Int.sexp_of_t) (Float.sexp_of_t) priors in
+          let hgram_sexp = Hashtbl.sexp_of_t (Rule.sexp_of_t) (Float.sexp_of_t) hgram in
+          let sexp = Sexp.List
+            [Int2StringMap.sexp_of_t Ptbtree.nt_map; Int2StringMap.sexp_of_t Ptbtree.w_map; priors_sexp; hgram_sexp] in
+          Sexp.save_hum model sexp;
+          train_string_trees
+        in
+        (* load simple cky parser*)
+        match dev_filename with
+        | None -> ()
+        | Some dev_filename ->
+           let grammar = Ckygram.from_model_file verbose model in
+           let dev_string_trees,_,_ = Treebank.process_file verbose dev_filename 0 in
+           let _ = List.fold dev_string_trees ~init:(0,0)
+             ~f:(fun (correct,total) tree ->
+               let c,t  = CKY.test_forest grammar false tree in
+               let correct,total = correct + c, total + t in
+               printf "matched: %f%%\r%!"  (100.0 *. (Float.of_int correct) /. (Float.of_int total));
+               correct,total
+             )
+           in printf "\n"
     )
 
 let parse =
@@ -65,28 +84,30 @@ let parse =
     Command.Spec.
     (
       empty
-      +> flag "-f" (required file) ~doc: "filename Test set (tok format)" (* TODO:  make it optional and able to read stdin *)
+      +> flag "-f" (required file) ~doc: "filename Test set (tok/tag format)" (* TODO:  make it optional and able to read stdin *)
       +> flag "-m" (required file) ~doc: "filename Model name"
+      +> flag "-t" (optional_with_default false bool) ~doc: "tagged input"
       +> flag "-v" (no_arg) ~doc: " Verbose mode"
     )
     (fun file
       model
+      tagged
       verbose
       () ->
 
         let grammar = Ckygram.from_model_file verbose model in
-        let () = CKY.parse_file grammar file in
+        let () = CKY.parse_file grammar tagged file in
         ()
     )
 
 
 
 let command =
-      (* let c = Gc.get () in *)
-      (* let () = printf "minor heap size before : %d \n%!" c.minor_heap_size in *)
-      (* let () = Gc.tune ~minor_heap_size:(262144 * 32) () in *)
-      (* let c = Gc.get () in *)
-      (* let () = printf "minor heap size after : %d \n%!" c.minor_heap_size in *)
+      let c = Gc.get () in
+      let () = fprintf Out_channel.stderr "minor heap size before : %d \n%!" c.minor_heap_size in
+      let () = Gc.tune ~minor_heap_size:(262144 * 32) () in
+      let c = Gc.get () in
+      let () = fprintf Out_channel.stderr "minor heap size after : %d \n%!" c.minor_heap_size in
       (* let () = Gc.tune ~major_heap_increment:(1000448 * 8) () in *)
   Command.group
     ~summary:"HP parser"

@@ -19,5 +19,4 @@ open Core.Std
 open Ptbtree
 open Rule
 
-(* val process_file : bool -> string -> int -> Ptbtree.int_tree list *)
-val process_file : bool -> string -> int -> int * (int,float) Hashtbl.t * (Rule.t,float) Hashtbl.t
+val process_file : bool -> string -> int -> (Ptbtree.string_tree list) * (int,float) Hashtbl.t * (Rule.t,float) Hashtbl.t

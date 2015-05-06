@@ -63,15 +63,19 @@ let read_treebank filename =
 
 let process_file verbose filename unk_threshold =
 
-  let nb_pos,tree_list =
-  (if verbose then fprintf Out_channel.stderr "read treebank\n%!" ;
-  read_treebank filename) |>
-      (if verbose then fprintf Out_channel.stderr "mask rare tokens\n%!";
-       Ptbtree.replace_rares_simple unk_threshold) |>
-          (if verbose then fprintf Out_channel.stderr "encode strings\n%!";
-           Ptbtree.convert_string_trees)
+  let string_trees =
+    if verbose then fprintf Out_channel.stderr "read treebank\n%!" ;
+    read_treebank filename
+  in
+  let string_trees =
+    if verbose then fprintf Out_channel.stderr "mask rare tokens\n%!";
+    Ptbtree.replace_rares_simple unk_threshold string_trees
+  in
+  let _,int_trees =
+    if verbose then fprintf Out_channel.stderr "encode strings\n%!";
+    Ptbtree.convert_string_trees string_trees
   in
 
   let () = if verbose then fprintf Out_channel.stderr "compute pcfg weights/priors\n%!"  in
-  let priors, hgram = Rule.create_pcfg tree_list in
-  (nb_pos,priors,hgram)
+  let priors, hgram = Rule.create_pcfg int_trees in
+  (string_trees,priors,hgram)

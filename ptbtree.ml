@@ -78,18 +78,21 @@ struct
   let rec unbinarize t =
     match t with
     | Tree.Leaf(_,_) -> t
-    | Tree.Node(n, l) ->
-       Tree.Node(n,
-       List.fold
-         ~f:(fun acc d ->
-           match d with
-           | Tree.Node(nd,ld) ->
-              let ld' = List.map ~f:unbinarize ld in
-              if nd.[0] = '@' then ld'@acc else Tree.Node(nd, ld')::acc
-           | _ ->  d::acc
-         )
-         ~init:[]
-         l)
+    | Tree.Node(n, [d1]) -> Tree.Node(n, [unbinarize d1])
+    | Tree.Node(n, [d1;d2]) ->
+       let rec collect_daughters acc tin =
+         match tin with
+         | Tree.Node (n,[d1;d2]) ->
+            if n.[0] = '@'
+            then
+              collect_daughters (d1::acc) d2
+            else
+              tin::acc
+         | _ -> tin::acc
+       in
+       let l = collect_daughters [d1] d2 in
+       Tree.Node(n, List.rev_map l ~f:unbinarize)
+    | _ -> failwith "tree is ill-formed"
 
   let process_tree t =
     clean_nodes t |> remove_trace |> binarize_right |> add_top_node
@@ -164,14 +167,6 @@ struct
     | Tree.Node(n,l) -> Tree.Node(Int2StringMap.int2str nt_map n, List.map ~f:convert_int_tree l)
 
 
-  let convert_string_trees l =
-    (* List.iter ~f:convert_string_yield l; *)
-    (* let nb_pos = Int2StringMap.get_size nt_map in *)
-    (* let l' = List.map  ~f:convert_string_tree l in *)
-    (* nb_pos,l' *)
-    -1, List.map  ~f:convert_string_tree l
-
-
   (***********************************)
   type annotation = {b: int; e: int}
   type annotated_tree = (int * annotation, int * annotation) Tree.t
@@ -189,8 +184,39 @@ struct
              let tree' = rec_annotate tree b' in
              (b'+ n), tree'::l'
            ) in
-         Tree.Node((n,(b,e)),List.rev al)
+         Tree.Node((n,(b,e-1)),List.rev al)
     in
     rec_annotate tree 0
+
+
+
+
+  let convert_string_trees l =
+    (* List.iter ~f:convert_string_yield l; *)
+    (* let nb_pos = Int2StringMap.get_size nt_map in *)
+    (* let l' = List.map  ~f:convert_string_tree l in *)
+    (* nb_pos,l' *)
+
+    (* List.iter l *)
+    (*   ~f:(fun tree -> *)
+    (*     printf "%s\n%!" (to_string tree); *)
+    (*     let tree' = annotate tree in *)
+    (*     let rec aux t = *)
+    (*       match t with *)
+    (*       | Tree.Leaf((pos,(b,c)),_) ->   printf "(%s,%d,%d)\n%!"   pos b c *)
+    (*       | Tree.Node((lhs,(b,c)),l) -> *)
+    (*          (if List.length l = 2 *)
+    (*          then *)
+    (*              printf "(%s,%d,%d)\n%!" lhs b c); *)
+    (*         List.iter l ~f:aux *)
+    (*     in *)
+    (*     aux tree' *)
+    (*   ); *)
+
+    printf "\n\n%!";
+
+    -1, List.map  ~f:convert_string_tree l
+
+
 
 end

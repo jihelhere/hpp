@@ -59,19 +59,24 @@ end = struct
 
   let rec compose_unaries path_length punaries =
 
-    let rec compute_new originals candidates =
-      match originals with
+    let rec compute_new candidates =
+      match candidates with
       | [] -> []
       | ( (Una(l,r,_),_) as original)::t ->
-         let (replace,noreplace) = List.partition_tf candidates
+         let (replace,noreplace) = List.partition_tf t
            ~f:(function
            | Una(l',r',_),_ -> l=l' && r=r'
            | _ -> false) in
          let max = List.fold replace ~init:original
-           ~f:(fun (max,pr) (r,pr') -> if pr' > pr then (r,pr') else (max,pr)) in
-         max::(compute_new t noreplace)
+           ~f:(fun (max,pr) (r,pr') ->
+             (* printf "pr: %f pr': %f\n%!" pr pr'; *)
+
+             if pr' > pr then (r,pr') else (max,pr)) in
+         max::(compute_new noreplace)
       | _ -> failwith "nope"
     in
+
+    printf "%d\n%!" (List.length punaries);
 
     if path_length = 0 then punaries
     else
@@ -94,7 +99,8 @@ end = struct
             | _ -> failwith "ill-formed rule"
           )
       in
-      let new_punaries = compute_new punaries newly_created in
+      let () = printf "%d\n%!" (List.length newly_created) in
+      let new_punaries = compute_new (punaries@newly_created) in
       compose_unaries (path_length - 1) new_punaries
 
 
@@ -152,8 +158,9 @@ end = struct
       ) in
 
     let unaries_simple = Hashtbl.to_alist unaries in
-
+    let () = fprintf Out_channel.stderr "nb unaries before composition: %d\n%!" (List.length unaries_simple) in
     let unaries_complete = compose_unaries 1 unaries_simple in
+      let () = fprintf Out_channel.stderr "nb unaries after composition: %d\n%!" (List.length unaries_complete) in
     let unaries_complete_hash = Hashtbl.of_alist_exn ~hashable: hashable unaries_complete in
     let pcfg = Hashtbl.merge unaries_complete_hash binlex
       ~f:(fun ~key:_  data ->
