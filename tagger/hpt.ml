@@ -18,11 +18,21 @@
 open Core.Std
 open Conlltag
 
+open Perceptrontrainer
+open Templatetag
+open Featuretag
+
+module Sequence =
+struct
+
+  module C = Conll_Tag
+  module T = Template_Tag
+  module Feature = Feature(C)(Template_Tag)
+
+
 type cell = {uni_score: float; bi_score:float}
 type tier = cell array
 type hypotheses = tier array
-
-
 
 let build_hypotheses nb_labels sent =
 
@@ -37,8 +47,20 @@ let build_hypotheses nb_labels sent =
 
 
 
+let decode params input = input
+let compute_score_difference t1 t2 = 0.0
+
+end
+
+
+(* module TS = TrainSelecter(Conll_Tag)(Sequence) *)
+module Trainer = PerceptronTrainer(Conll_Tag)(Sequence)
+
+
 
 let train =
+
+  (* let trainer_table = TS.create_known_table () in *)
 
   Command.basic
     ~summary:"Train and eval  structured perceptron tagger"
@@ -57,30 +79,20 @@ let train =
     (fun train_filename dev_filename test_filename
          max_iter feature_threshold model algo verbose () ->
 
-
-           let filename_to_list x = x |> Conll_Tag.do_read_file |> Conll_Tag.corpus_to_list in
-           let open Option.Monad_infix in
-           let filename_to_list_opt x = x >>= (fun df -> Some (filename_to_list df)) in
-
-           let train_instances = filename_to_list train_filename    in
-           let dev_instances   = filename_to_list_opt dev_filename  in
-           let test_instances  = filename_to_list_opt test_filename in
-
            (* let (module Trainer : OnlineTrainer) = *)
            (*   match Hashtbl.find trainer_table algo with *)
            (*   | None -> failwith "unknown training algorithm" *)
            (*   | Some x -> x *)
            (* in *)
 
-()
 
-        (*    Trainer.train ~train_instances ~dev_instances ~test_instances *)
-        (*      ~max_iter ~feature_threshold *)
-        (*      ~label_prune_table *)
-        (*      ~distance_prune_table *)
-        (*      ~labeled *)
-        (*      ~verbose *)
-        (* |> Model.make label_prune_table distance_prune_table MyParser.name labeled *)
+           let m = Trainer.train ~train_filename ~dev_filename ~test_filename
+             ~max_iter ~feature_threshold
+             ~verbose
+
+in ()
+
+    (* |> Model.make label_prune_table distance_prune_table MyParser.name labeled *)
         (* |> Model.save ~filename:model *)
 
     )

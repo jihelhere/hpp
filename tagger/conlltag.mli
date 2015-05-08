@@ -18,11 +18,16 @@
 open Core.Std
 open Sexp
 
+
 module Conll_Tag :
   sig
     type t
     type sentence
     type corpus
+
+    val same_prediction : t -> t -> bool
+    val prediction : t -> int
+    val prepare_sentence_for_decoder : sentence -> t array
 
     val corpus_to_list : corpus -> sentence list
     val list_to_corpus : sentence list -> corpus

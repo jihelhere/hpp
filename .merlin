@@ -1,3 +1,5 @@
 PKG core re2
-
+S tagger
+S parser
+S utils
 B _build

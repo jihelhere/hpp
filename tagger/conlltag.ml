@@ -20,6 +20,21 @@ open Int2stringmap
 module Regex = Re2.Regex
 
 
+(* module type ConllType = *)
+(* sig *)
+(*     type t *)
+(*     type sentence *)
+(*     type corpus *)
+
+(*     val prediction : t -> bool *)
+(*     val same_prediction : t -> t -> bool *)
+(*     val prepare_sentence_for_decoder : sentence -> t array *)
+(*     val to_string : t -> string *)
+
+(*     val do_read_file : string -> corpus *)
+(*     val corpus_to_list : corpus -> sentence list *)
+(* end *)
+
 module Conll_Tag =
 struct
 
@@ -32,6 +47,8 @@ struct
       suffix     : int;
     }
 
+  let same_prediction t1 t2 = t1.pos = t2.pos
+  let prediction t = t.pos
 
   let form_map = Int2StringMap.empty ()
   let pos_map = Int2StringMap.empty ()
@@ -116,6 +133,11 @@ struct
   let sentence_to_list sentence = sentence
   let list_to_sentence sentence = sentence
 
+
+  let prepare_sentence_for_decoder sentence =
+    Array.of_list sentence
+
+
   let load_map_from_sexp sexp =
     match sexp with
     | Sexp.List ([Sexp.Atom name; map]) ->
@@ -187,6 +209,8 @@ struct
                                  )
            )
       )
+
+
 
 
 end
