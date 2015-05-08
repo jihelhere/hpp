@@ -16,21 +16,13 @@
  *)
 
 open Conll
+open Feature
 
-module type Eval =
+module type Decoder =
 sig
+ module C :  ConllType
+  module Feature : Feature with module C = C
 
-  module C : ConllType
-  type t
-  val empty : t
-
-  val reset : t -> unit
-
-  (* return Score (or 1 - Loss) and exact match*)
-  val to_score : t -> (float * float)
-
-  val update : t -> C.t array -> C.t array -> unit
-
-  val to_string : t -> string
-
+  val decode : float array -> C.t array -> C.t array
+  val  compute_score_difference : C.t -> C.t -> float
 end

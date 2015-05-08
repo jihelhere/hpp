@@ -25,6 +25,7 @@ let delta = function
 
 
 module Eval_Tag (C : ConllType) = struct
+  module C = C
   type t =
       {
         mutable total_pos   : int;

@@ -3,7 +3,10 @@ parser/rule.ml parser/rule.mli parser/cky.ml parser/cky.mli parser/treebank.ml p
 parser/ckygram.ml parser/ckygram.mli \
 parser/backpointer.ml parser/backpointer.mli
 
-TSOURCES= tagger/hpt.ml tagger/conlltag.ml tagger/conlltag.mli
+TSOURCES= tagger/hpt.ml tagger/conlltag.ml tagger/conlltag.mli \
+	utils/conll.mli utils/decoder.mli utils/eval.mli utils/feature.mli \
+	utils/int2stringmap.ml utils/int2stringmap.mli utils/perceptrontrainer.ml \
+	utils/perceptrontrainer.mli utils/template.mli
 
 all: hpp.native hpt.native
 

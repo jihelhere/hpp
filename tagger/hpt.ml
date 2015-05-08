@@ -21,6 +21,7 @@ open Conlltag
 open Perceptrontrainer
 open Templatetag
 open Featuretag
+open Evaltag
 
 module Sequence =
 struct
@@ -54,7 +55,7 @@ end
 
 
 (* module TS = TrainSelecter(Conll_Tag)(Sequence) *)
-module Trainer = PerceptronTrainer(Conll_Tag)(Sequence)
+module Trainer = PerceptronTrainer(Conll_Tag)(Eval_Tag(Conll_Tag))(Sequence)
 
 
 

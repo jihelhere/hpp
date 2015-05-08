@@ -18,23 +18,9 @@
 open Core.Std
 
 open Conll
-open Evaltag
-
-(* open Parser *)
+open Eval
+open Decoder
 open Feature
-(* open Deptree *)
-
-
-
-module type Decoder =
-sig
-  module C :  ConllType
-  module Feature : Feature with module C = C
-
-  val decode : float array -> C.t array -> C.t array
-  val compute_score_difference : C.t -> C.t -> float
-end
-
 
 module type Updater =
 sig
@@ -47,24 +33,24 @@ sig
     val average : t -> float array
   end
 
-module OnlineMarginTrainer = functor (C : ConllType )
-    -> functor (U : Updater with module C = C)
-        -> functor (D : Decoder with module C = U.C) ->
+module OnlineMarginTrainer =
+  functor (C : ConllType )
+    -> functor (E : Eval with module C = C)
+        -> functor (U : Updater with module C = E.C)
+            -> functor (D : Decoder with module C = U.C) ->
 struct
-
-  module Eval = Eval_Tag(C)
 
     (* a triplet of functions *)
     (* first one prints UAS/LAS info : will be called after each training example *)
     (* second one resets eval variables : will be called before each pass *)
     (* third one returns final UAS score *)
     let eval_dep_parse () =
-      let eval = Eval.empty in
+      let eval = E.empty in
       let update_stats ref_sent hyp_sent =
-        Eval.update eval ref_sent hyp_sent;
-        Printf.printf "%s\r%!" (Eval.to_string eval) in
-      let reset_stats () = Eval.reset eval in
-      let final_score () = Eval.to_score eval |> fst in
+        E.update eval ref_sent hyp_sent;
+        Printf.printf "%s\r%!" (E.to_string eval) in
+      let reset_stats () = E.reset eval in
+      let final_score () = E.to_score eval |> fst in
       (update_stats, reset_stats, final_score)
 
     let train_and_eval feature_weights fun_update
@@ -178,7 +164,7 @@ struct
   end
 
 
-module PerceptronTrainer(Co : ConllType) (D : Decoder with module C = Co) =
+module PerceptronTrainer(Co : ConllType) (E : Eval with module C = Co) (D : Decoder with module C = Co) =
   struct
 
     module UpdatePerceptron : Updater with module C = D.C =
@@ -243,14 +229,14 @@ module PerceptronTrainer(Co : ConllType) (D : Decoder with module C = Co) =
           t.weights
       end
 
-    include OnlineMarginTrainer(Co)(UpdatePerceptron)(D)
+    include OnlineMarginTrainer(Co)(E)(UpdatePerceptron)(D)
 
     let name = "perceptron"
   end
 
 
 
-module MiraTrainer (Co : ConllType) (D : Decoder with module C = Co) =
+module MiraTrainer (Co : ConllType) (E : Eval with module C = Co) (D : Decoder with module C = Co) =
   struct
      module UpdateOneBestMira : Updater with module C = D.C =
      struct
@@ -338,7 +324,7 @@ module MiraTrainer (Co : ConllType) (D : Decoder with module C = Co) =
         let average t = Array.copy t.average_weights
         let get_weights t = t.weights
       end
-    include OnlineMarginTrainer(Co)(UpdateOneBestMira)(D)
+    include OnlineMarginTrainer(Co)(E)(UpdateOneBestMira)(D)
 
     let name = "mira"
   end

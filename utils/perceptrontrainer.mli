@@ -18,17 +18,8 @@
 open Core.Std
 open Conll
 open Feature
-
-module type Decoder =
-sig
- module C :  ConllType
-  module Feature : Feature with module C = C
-
-  val decode : float array -> C.t array -> C.t array
-  val  compute_score_difference : C.t -> C.t -> float
-end
-
-
+open Decoder
+open Eval
 
 module type OnlineTrainer =
 sig
@@ -44,8 +35,8 @@ sig
   end
 
 
-module PerceptronTrainer (Co : ConllType) (D: Decoder with module C = Co) : OnlineTrainer
-module MiraTrainer (Co : ConllType) (D: Decoder with module C = Co) : OnlineTrainer
+module PerceptronTrainer (Co : ConllType) (E : Eval with module C = Co) (D: Decoder with module C = Co) : OnlineTrainer
+module MiraTrainer (Co : ConllType) (E : Eval with module C = Co) (D: Decoder with module C = Co) : OnlineTrainer
 
 
 
