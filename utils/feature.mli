@@ -35,14 +35,7 @@ sig
                          (int option -> int option) -> C.t array -> int -> unit
 
 
-  val compute_score_difference : C.t -> C.t -> float
-
-  (* val get_head_score:  float Array.t -> Conll.t Array.t -> int -> int -> float *)
-  (* val get_mod_score :  float Array.t -> Conll.t Array.t -> int -> int -> float *)
-  (* val get_dep_score :  float Array.t -> Conll.t Array.t -> int -> int -> float *)
-
-
-  (* val get_and_collect_all_zeros : Conll.t array -> int -> int -> float *)
+  val compute_score_difference : float array -> C.t array -> C.t array -> int -> C.t -> C.t -> float
 
   val prune_features : int -> int
 

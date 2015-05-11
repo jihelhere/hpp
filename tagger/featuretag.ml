@@ -2,12 +2,13 @@
 open Core.Std
 
 open Int2stringmap
-open Template
-open Conll
+open Templatetag
+open Conlltag
 
-module Feature (C : ConllType) (T : Template with module C = C) = struct
+module Feature_Tag = struct
 
-  module C = C
+  module C = Conll_Tag
+  module T = Template_Tag
 
   type t = int
 
@@ -36,7 +37,10 @@ module Feature (C : ConllType) (T : Template with module C = C) = struct
 
   let get_all_features  htbl feature_vector_size opt_oper sent d =
     let is_valid i = i > 0 && i < feature_vector_size in
-    (* let _ = T.fill_hash_table  htbl is_valid of_template_valid opt_oper sent h d in *)
+
+    let pos = C.prediction (Array.unsafe_get sent d) in
+    let ppos = if d = 0 then -1 else C.prediction (Array.unsafe_get sent (d-1)) in
+    let _ : float = T.fill_hash_table  htbl is_valid of_template_valid opt_oper sent d ppos pos in
     ()
 
 
@@ -46,13 +50,11 @@ module Feature (C : ConllType) (T : Template with module C = C) = struct
     then Array.unsafe_get feature_vector idx
     else 0.0
 
-  (* let get_head_score feature_vector sent h td = *)
-  (*   Template.make_template_tok_head false (fun_score feature_vector) sent h td *)
-  (* let get_mod_score  feature_vector sent m td = *)
-  (*   Template.make_template_tok_mod  false (fun_score feature_vector) sent m td *)
-  (* let get_dep_score  feature_vector sent h m = *)
-  (*   Template.make_template_dep  (fun_score feature_vector) sent h m *)
+  let get_uni_score feature_vector sent i pos =
+    T.make_template_uni (fun_score feature_vector) sent i pos
 
+  let get_bi_score feature_vector sent i ppos pos =
+    T.make_template_bi (fun_score feature_vector) sent i ppos pos
 
   let prune_features threshold =
     let () = Printf.printf "feature table contains %d entries\n" (Hashtbl.length T.table_collect_templates) in
@@ -121,6 +123,29 @@ module Feature (C : ConllType) (T : Template with module C = C) = struct
                 |> T.collect_templates ~only_gold
               )
 
-  let compute_score_difference refp hypp  = 0.0
+  let compute_score_difference params refs hyps i refp hypp  =
+    (get_uni_score params refs i (C.prediction refp))
+    +.
+      (if i > 0
+       then (get_bi_score params refs i (C.prediction (Array.unsafe_get refs (i-1))) (C.prediction refp))
+       else (get_bi_score params refs i (C.prediction C.start) (C.prediction refp) ))
+    +. (*not sure about this one*)
+      (if i = (Array.length refs) -1
+       then (get_bi_score params refs (Array.length refs) (C.prediction refp) (C.prediction C.stop))
+       else 0.0)
+    -.
+      (get_uni_score params hyps i (C.prediction hypp))
+    -.
+      (if i > 0
+       then (get_bi_score params hyps i (C.prediction (Array.unsafe_get hyps (i-1))) (C.prediction hypp))
+       else (get_bi_score params hyps i (C.prediction C.start) (C.prediction hypp)))
+    -. (*not sure about this one*)
+      (if i = (Array.length hyps) -1
+       then (get_bi_score params hyps (Array.length hyps) (C.prediction hypp) (C.prediction C.stop))
+       else 0.0)
+
+
+
+
 
 end

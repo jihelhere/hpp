@@ -27,6 +27,7 @@ module Conll_Tag :
 
     val same_prediction : t -> t -> bool
     val prediction : t -> int
+    val set_prediction : t -> int -> t
     val prepare_sentence_for_decoder : sentence -> t array
 
     val corpus_to_list : corpus -> sentence list
@@ -36,6 +37,9 @@ module Conll_Tag :
 
     val start : t
     val stop : t
+    val digit : t
+
+    val is_digit : t -> bool
 
     val get_form : t -> string
     val get_pos : t -> string

@@ -40,7 +40,7 @@ module MiraTrainer (Co : ConllType) (E : Eval with module C = Co) (D: Decoder wi
 
 
 
-(* module TrainSelecter (C : ConllType) (P : Decoder with module C = C) : *)
-(* sig *)
-(*   val create_known_table : unit -> (module OnlineTrainer) String.Table.t *)
-(* end *)
+module TrainSelecter (C : ConllType)(E : Eval with module C = C)(P : Decoder with module C = C) :
+sig
+  val create_known_table : unit -> (module OnlineTrainer) String.Table.t
+end

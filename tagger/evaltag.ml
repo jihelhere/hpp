@@ -51,9 +51,9 @@ module Eval_Tag (C : ConllType) = struct
 
 
   let update t ref_sentence hyp_sentence =
-    t.total_pos <- t.total_pos + (Array.length ref_sentence) - 1;
+    t.total_pos <- t.total_pos + (Array.length ref_sentence);
     let perfect = ref true in
-    for i = 1 to (Array.length ref_sentence) - 1 do
+    for i = 0 to (Array.length ref_sentence) - 1 do
       if(C.same_prediction ref_sentence.(i) hyp_sentence.(i))
       then t.correct_pos <- t.correct_pos + 1
       else perfect := false

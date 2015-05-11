@@ -6,7 +6,9 @@ parser/backpointer.ml parser/backpointer.mli
 TSOURCES= tagger/hpt.ml tagger/conlltag.ml tagger/conlltag.mli \
 	utils/conll.mli utils/decoder.mli utils/eval.mli utils/feature.mli \
 	utils/int2stringmap.ml utils/int2stringmap.mli utils/perceptrontrainer.ml \
-	utils/perceptrontrainer.mli utils/template.mli
+	utils/perceptrontrainer.mli utils/template.mli \
+	tagger/templatetag.ml tagger/featuretag.ml \
+	tagger/modeltag.ml
 
 all: hpp.native hpt.native
 

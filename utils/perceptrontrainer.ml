@@ -41,10 +41,10 @@ module OnlineMarginTrainer =
 struct
 
     (* a triplet of functions *)
-    (* first one prints UAS/LAS info : will be called after each training example *)
+    (* first one prints score info : will be called after each training example *)
     (* second one resets eval variables : will be called before each pass *)
-    (* third one returns final UAS score *)
-    let eval_dep_parse () =
+    (* third one returns final score *)
+    let eval_task () =
       let eval = E.empty in
       let update_stats ref_sent hyp_sent =
         E.update eval ref_sent hyp_sent;
@@ -70,17 +70,16 @@ struct
 
 
     let train_epoch ~update_func ~feature_weights ~corpus =
-      train_and_eval feature_weights update_func (eval_dep_parse ())
-                     corpus
+      train_and_eval feature_weights update_func (eval_task ()) corpus
 
     let dont_update_model = fun _ _ _ -> ()
 
     let eval_epoch ~feature_weights ~corpus =
-      train_and_eval feature_weights dont_update_model (eval_dep_parse ()) corpus
+      train_and_eval feature_weights dont_update_model (eval_task ()) corpus
 
     let eval_print_epoch ~filename ~feature_weights ~corpus =
       let oc = Out_channel.create filename in
-      let (update_stats, reset_stats, final_score) = eval_dep_parse ()
+      let (update_stats, reset_stats, final_score) = eval_task ()
       in
       let update_stats_print sentence hypothesis =
         update_stats sentence hypothesis;
@@ -127,7 +126,6 @@ struct
             ~feature_weights:(U.get_weights updater)
             ~corpus:train_instances
           in
-
 
           let average = U.average updater in
 
@@ -185,32 +183,30 @@ module PerceptronTrainer(Co : ConllType) (E : Eval with module C = Co) (D : Deco
 
       let incr_examples t = t.counter <- t.counter +1
 
-
-
         (* compute perceptron update*)
-        let update  t _ _ _ ref_sentence hyp_sentence =
-          let htbl = Hashtbl.create ~hashable:Int.hashable () in
+      let update  t _ _ _ ref_sentence hyp_sentence =
+        let htbl = Hashtbl.create ~hashable:Int.hashable () in
 
-          let opt_oper oper = function
-            | None -> Some (oper 0 1) (* init: +/- 1 *)
-            | Some x -> Some (oper x 1) (* update: x +/- 1 *)
-          in
+        let opt_oper oper = function
+          | None -> Some (oper 0 1) (* init: +/- 1 *)
+          | Some x -> Some (oper x 1) (* update: x +/- 1 *)
+        in
 
-          (* get feature counts where solutions are different *)
-          let rec loop_on_seq i =
-            if i < Array.length ref_sentence
-            then
-              let () =
-                if  not (Co.same_prediction ref_sentence.(i) hyp_sentence.(i))
-                then
-                  (
-                    D.Feature.get_all_features  htbl t.size (opt_oper (+)) ref_sentence i;
-                    D.Feature.get_all_features  htbl t.size (opt_oper (-)) hyp_sentence i
-                  )
-              in
-              loop_on_seq (i+1)
-          in
-          let () = loop_on_seq 1 in
+        (* get feature counts where solutions are different *)
+        let rec loop_on_seq i =
+          if i < Array.length ref_sentence
+          then
+            let () =
+              if  not (Co.same_prediction ref_sentence.(i) hyp_sentence.(i))
+              then
+                (
+                  D.Feature.get_all_features  htbl t.size (opt_oper (+)) ref_sentence i;
+                  D.Feature.get_all_features  htbl t.size (opt_oper (-)) hyp_sentence i
+                )
+            in
+            loop_on_seq (i+1)
+        in
+        let () = loop_on_seq 0 in
 
           (* update model *)
           incr_examples t;
@@ -283,24 +279,23 @@ module MiraTrainer (Co : ConllType) (E : Eval with module C = Co) (D : Decoder w
               in
               loop_on_arcs (i+1)
           in
-          let () = loop_on_arcs 1 in
+          let () = loop_on_arcs 0 in
 
           (* update model *)
           incr_examples t;
 
           let norm = Hashtbl.fold htbl ~init:0 ~f:(fun ~key:_ ~data:c acc -> acc + c*c) |> Float.of_int in
 
-          (*TODO: this is UAS loss, need to parameterize with something else *)
-          let (loss,diff_score) =
+          let (_,loss,diff_score) =
             Array.fold2_exn ref_sentence hyp_sentence
-                            ~init:(0,0.0)
-                            ~f:(fun (loss',diff_score) re hy ->
+                            ~init:(0,0,0.0)
+                            ~f:(fun (i,loss',diff_score) re hy ->
                                 if C.same_prediction re  hy
-                                then (loss',diff_score)
+                                then (i+1,loss',diff_score)
                                 else
-                                  let ds = D.Feature.compute_score_difference re hy
+                                  let ds = D.Feature.compute_score_difference t.weights ref_sentence hyp_sentence i re hy
                                   in
-                                  (loss'+1,diff_score +. ds)) in
+                                  (i+1,loss'+1,diff_score +. ds)) in
 
           (* let () = *)
           (*   printf "diff_score (should be negative): %f\n%!" diff_score in *)
@@ -344,21 +339,21 @@ module type OnlineTrainer =
   end
 
 
-(* module TrainSelecter (C : ConllType) (D : Decoder with module C = C) = *)
-(*   struct *)
+module TrainSelecter (C : ConllType) (E : Eval with module C = C) (D : Decoder with module C = C) =
+  struct
 
 
-(*     let perceptron = (module PerceptronTrainer(C)(D) : OnlineTrainer) *)
-(*     let mira = (module MiraTrainer(C)(D) : OnlineTrainer) *)
+    let perceptron = (module PerceptronTrainer(C)(E)(D) : OnlineTrainer)
+    let mira = (module MiraTrainer(C)(E)(D) : OnlineTrainer)
 
-(*     let known_trainers = [ perceptron; mira;] *)
+    let known_trainers = [ perceptron; mira;]
 
 
-(*     let create_known_table () = *)
-(*       let known  = String.Table.create () in *)
-(*       List.iter known_trainers *)
-(*                 ~f:(fun ((module Q : OnlineTrainer) as q) -> *)
-(*                     Hashtbl.replace known ~key:Q.name ~data:q); *)
-(*       known *)
+    let create_known_table () =
+      let known  = String.Table.create () in
+      List.iter known_trainers
+                ~f:(fun ((module Q : OnlineTrainer) as q) ->
+                    Hashtbl.replace known ~key:Q.name ~data:q);
+      known
 
-(*   end *)
+  end

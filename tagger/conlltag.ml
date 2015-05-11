@@ -20,21 +20,6 @@ open Int2stringmap
 module Regex = Re2.Regex
 
 
-(* module type ConllType = *)
-(* sig *)
-(*     type t *)
-(*     type sentence *)
-(*     type corpus *)
-
-(*     val prediction : t -> bool *)
-(*     val same_prediction : t -> t -> bool *)
-(*     val prepare_sentence_for_decoder : sentence -> t array *)
-(*     val to_string : t -> string *)
-
-(*     val do_read_file : string -> corpus *)
-(*     val corpus_to_list : corpus -> sentence list *)
-(* end *)
-
 module Conll_Tag =
 struct
 
@@ -50,13 +35,15 @@ struct
   let same_prediction t1 t2 = t1.pos = t2.pos
   let prediction t = t.pos
 
+  let set_prediction t i = {t with pos=i}
+
   let form_map = Int2StringMap.empty ()
   let pos_map = Int2StringMap.empty ()
 
 
   (* TODO: command line argument to set this *)
-  let prefix_length = 4
-  let suffix_length = 4
+  let prefix_length = 1
+  let suffix_length = 3
 
   let prefix_map = Int2StringMap.empty ()
   let suffix_map = Int2StringMap.empty ()
@@ -98,6 +85,13 @@ struct
                suffix = Int2StringMap.str2int suffix_map (get_string_suffix "__STOP__");
               }
 
+  let digit = {idx = 0;
+               form = Int2StringMap.str2int form_map "__DIGIT__";
+               pos = Int2StringMap.str2int pos_map "__DIGIT__";
+               prefix = Int2StringMap.str2int prefix_map (get_string_prefix "__DIGIT__");
+               suffix = Int2StringMap.str2int suffix_map (get_string_suffix "__DIGIT__");
+              }
+
 
   let get_idx t = t.idx
   let get_form t = Int2StringMap.int2str form_map t.form
@@ -119,9 +113,14 @@ struct
 
   let to_string t =
     Printf.sprintf "%d\t%s\t%s"
-                   (get_idx t)
-                   (get_form t)
-                   (get_pos t)
+      (get_idx t)
+      (get_form t)
+      (get_pos t)
+
+  let is_digit t =
+    let first = (get_form t).[0] in
+    first >= '0' && first <= '9'
+
 
 
   type sentence = t list
