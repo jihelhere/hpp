@@ -168,7 +168,7 @@ struct
         l [ a "form_map" ; Int2StringMap.sexp_of_t form_map];
         l [ a "pos_map" ; Int2StringMap.sexp_of_t pos_map];
         l [ a "prefix_map" ; Int2StringMap.sexp_of_t prefix_map];
-        l [ a "suffix_map" ; Int2StringMap.sexp_of_t prefix_map]
+        l [ a "suffix_map" ; Int2StringMap.sexp_of_t suffix_map]
       ]
 
   let save_all_string_tables_to_file filename =
