@@ -25,15 +25,18 @@ open Feature
 module type Updater =
 sig
     module C : ConllType
-
     type t
     val create : total:int -> size:int -> t
     val update :  t -> int -> int -> int -> C.t array ->  C.t array -> unit
-    val get_weights : t -> float array
+    val weights : t -> float array
     val average : t -> float array
   end
 
-module OnlineMarginTrainer (C : ConllType) (E : Eval with module C = C)(U : Updater with module C = E.C)(D : Decoder with module C = U.C) =
+module OnlineMarginTrainer
+  (C : ConllType)
+  (E : Eval with module C = C)
+  (U : Updater with module C = E.C)
+  (D : Decoder with module C = U.C) =
 struct
 
     (* a triplet of functions *)
@@ -119,7 +122,7 @@ struct
           in
 
           let (_ : float) = train_epoch ~update_func:(U.update updater max_iter epoch)
-            ~feature_weights:(U.get_weights updater)
+            ~feature_weights:(U.weights updater)
             ~corpus:train_instances
           in
 
@@ -217,7 +220,7 @@ module PerceptronTrainer(Co : ConllType) (E : Eval with module C = Co) (D : Deco
         let average t =
           Array.init t.size ~f:(fun i -> t.weights.(i) -. (t.average_weights.(i) /. (Float.of_int t.counter)))
 
-        let get_weights t =
+        let weights t =
           t.weights
       end
 
@@ -313,7 +316,7 @@ module MiraTrainer (Co : ConllType) (E : Eval with module C = Co) (D : Decoder w
                           )
 
         let average t = Array.copy t.average_weights
-        let get_weights t = t.weights
+        let weights t = t.weights
       end
     include OnlineMarginTrainer(Co)(E)(UpdateOneBestMira)(D)
 
