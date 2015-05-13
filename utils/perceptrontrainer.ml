@@ -33,11 +33,7 @@ sig
     val average : t -> float array
   end
 
-module OnlineMarginTrainer =
-  functor (C : ConllType )
-    -> functor (E : Eval with module C = C)
-        -> functor (U : Updater with module C = E.C)
-            -> functor (D : Decoder with module C = U.C) ->
+module OnlineMarginTrainer (C : ConllType) (E : Eval with module C = C)(U : Updater with module C = E.C)(D : Decoder with module C = U.C) =
 struct
 
     (* a triplet of functions *)
@@ -248,11 +244,9 @@ module MiraTrainer (Co : ConllType) (E : Eval with module C = Co) (D : Decoder w
                                     examples = total;
                                     weights = Array.create ~len:size 0.0;
                                     average_weights = Array.create ~len:size 0.0;
-                                    clip = 0.01;}
+                                    clip = Float.infinity;}
 
         let incr_examples t = t.counter <- t.counter +1
-
-
 
         (* compute mira update*)
         let update  t max_iter epoch num ref_sentence hyp_sentence =
@@ -286,6 +280,8 @@ module MiraTrainer (Co : ConllType) (E : Eval with module C = Co) (D : Decoder w
 
           let norm = Hashtbl.fold htbl ~init:0 ~f:(fun ~key:_ ~data:c acc -> acc + c*c) |> Float.of_int in
 
+
+          (* TODO:  PROBLEM the score difference is not computed correctly*)
           let (_,loss,diff_score) =
             Array.fold2_exn ref_sentence hyp_sentence
                             ~init:(0,0,0.0)

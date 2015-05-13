@@ -304,20 +304,17 @@ module Template_Tag =
     let make_template_bi fun_score array_sentence i ppos pos =
       (* 0.0 *)
       let init = delta (i = 0) in
-      let tok =
-        if i >= Array.length array_sentence
-        then C.stop
-        else Array.unsafe_get array_sentence i in
+      let tok = if i >= Array.length array_sentence then C.stop else Array.unsafe_get array_sentence i in
       (* let tok = if C.is_digit tok then C.digit else tok in *)
       let word = C.get_form_id tok in
-      let pref = C.get_prefix_id tok in
-      let suf = C.get_suffix_id tok in
+      (* let pref = C.get_prefix_id tok in *)
+      (* let suf = C.get_suffix_id tok in *)
       (* (fun_score (fttt B_Bias ppos pos init)) *)
 0.0      +. (fun_score (ftt B_PPos ppos init))
       +. (fun_score (fwtt B_PPos_Word word ppos init))
       +. (fun_score (fwttt B_Word word ppos pos init))
-      +. (fun_score (fwttt B_Pref pref ppos pos init))
-      +. (fun_score (fwttt B_Suf suf  ppos pos init))
+      (* +. (fun_score (fwttt B_Pref pref ppos pos init)) *)
+      (* +. (fun_score (fwttt B_Suf suf  ppos pos init)) *)
 
     let of_int t = t
 

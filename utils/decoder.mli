@@ -24,5 +24,6 @@ sig
   module Feature : Feature with module C = C
 
   val decode : float array -> C.t array -> C.t array
-  val  compute_score_difference : C.t -> C.t -> float
+  val decode_corpus : filename:string -> feature_weights:float array -> corpus:C.corpus -> verbose:bool -> unit
+  (* val  compute_score_difference : C.t -> C.t -> float *)
 end
