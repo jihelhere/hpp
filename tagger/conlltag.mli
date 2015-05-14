@@ -26,8 +26,11 @@ module Conll_Tag :
     type corpus
 
     val same_prediction : t -> t -> bool
+    val same_fine_prediction : t -> t -> bool
     val prediction : t -> int
+    val latent_prediction : t -> int
     val set_prediction : t -> int -> t
+    val set_latentprediction : t -> int -> int -> t
     val prepare_sentence_for_decoder : sentence -> t array
 
     val corpus_to_list : corpus -> sentence list

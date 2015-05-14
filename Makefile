@@ -8,7 +8,7 @@ TSOURCES= tagger/hpt.ml tagger/conlltag.ml tagger/conlltag.mli \
 	utils/int2stringmap.ml utils/int2stringmap.mli utils/perceptrontrainer.ml \
 	utils/perceptrontrainer.mli utils/template.mli \
 	tagger/templatetag.ml tagger/featuretag.ml \
-	tagger/modeltag.ml
+	tagger/modeltag.ml tagger/sequencedecoder.ml
 
 all: hpp.native hpt.native
 

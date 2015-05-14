@@ -27,7 +27,7 @@ sig
     module C : ConllType
     type t
     val create : total:int -> size:int -> t
-    val update :  t -> int -> int -> int -> C.t array ->  C.t array -> unit
+    val update :  t -> int -> int -> int -> (C.t array*int*int) ->  (C.t array*int*int)  -> unit
     val weights : t -> float array
     val average : t -> float array
   end
@@ -55,6 +55,7 @@ struct
     let train_and_eval feature_weights fun_update
         (fun_eval, fun_reset_eval, final_score) corpus =
       let my_decoder = D.decode feature_weights in
+      let constrained_decoder = D.constrained_decode feature_weights in
 
       fun_reset_eval ();
       List.iteri corpus
@@ -62,6 +63,7 @@ struct
           (* let () = Printf.printf "sentence: %d\n%!" i in *)
           let ref_a = C.prepare_sentence_for_decoder s in
           let hyp_a = my_decoder ref_a in
+          let ref_a = constrained_decoder ref_a in
           fun_eval ref_a hyp_a;
           fun_update i ref_a hyp_a
         );
@@ -82,7 +84,9 @@ struct
       in
       let update_stats_print sentence hypothesis =
         update_stats sentence hypothesis;
-        Array.iter hypothesis ~f:(fun tok -> Printf.fprintf oc "%s\n%!" (C.to_string tok));
+        let (h,_,_) = hypothesis in
+        Array.iter h
+          ~f:(fun tok -> Printf.fprintf oc "%s\n%!" (C.to_string tok));
         Printf.fprintf oc "\n%!"
       in
       (* REMEMBER TO ALWAYS TYPE UNUSED RESULTS -> *)
@@ -184,44 +188,32 @@ module PerceptronTrainer(Co : ConllType) (E : Eval with module C = Co) (D : Deco
 
         (* compute perceptron update*)
       let update  t _ _ _ ref_sentence hyp_sentence =
-        let htbl = Hashtbl.create ~hashable:Int.hashable () in
 
         let opt_oper oper = function
           | None -> Some (oper 0 1) (* init: +/- 1 *)
           | Some x -> Some (oper x 1) (* update: x +/- 1 *)
         in
 
-        (* get feature counts where solutions are different *)
-        let rec loop_on_seq i =
-          if i < Array.length ref_sentence
-          then
-            let () =
-              if  not (Co.same_prediction ref_sentence.(i) hyp_sentence.(i))
-              then
-                (
-                  D.Feature.get_all_features  htbl t.size (opt_oper (+)) ref_sentence i;
-                  D.Feature.get_all_features  htbl t.size (opt_oper (-)) hyp_sentence i
-                )
-            in
-            loop_on_seq (i+1)
-        in
-        let () = loop_on_seq 0 in
 
-          (* update model *)
-          incr_examples t;
-          Hashtbl.iter htbl
-            ~f:(fun ~key:fi ~data:count ->
-              if count <> 0
-              then
-                (t.weights.(fi)         <- t.weights.(fi)         +. (Float.of_int count);
-                 t.average_weights.(fi) <- t.average_weights.(fi) +. (Float.of_int (t.counter * count)))
-            )
+        let htbl = Hashtbl.create ~hashable:Int.hashable () in
 
-        let average t =
-          Array.init t.size ~f:(fun i -> t.weights.(i) -. (t.average_weights.(i) /. (Float.of_int t.counter)))
+        let () = D.get_feature_differences htbl t.size ref_sentence hyp_sentence in
 
-        let weights t =
-          t.weights
+        (* update model *)
+        incr_examples t;
+        Hashtbl.iter htbl
+          ~f:(fun ~key:fi ~data:count ->
+            if count <> 0
+            then
+              (t.weights.(fi)         <- t.weights.(fi)         +. (Float.of_int count);
+               t.average_weights.(fi) <- t.average_weights.(fi) +. (Float.of_int (t.counter * count)))
+          )
+
+      let average t =
+        Array.init t.size ~f:(fun i -> t.weights.(i) -. (t.average_weights.(i) /. (Float.of_int t.counter)))
+
+      let weights t =
+        t.weights
       end
 
     include OnlineMarginTrainer(Co)(E)(UpdatePerceptron)(D)
@@ -252,7 +244,7 @@ module MiraTrainer (Co : ConllType) (E : Eval with module C = Co) (D : Decoder w
         let incr_examples t = t.counter <- t.counter +1
 
         (* compute mira update*)
-        let update  t max_iter epoch num ref_sentence hyp_sentence =
+        let update  t max_iter epoch num (ref_sentence,rfl,rel) (hyp_sentence,hfl,hel) =
           let htbl = Hashtbl.create ~hashable:Int.hashable () in
 
           let opt_oper oper = function

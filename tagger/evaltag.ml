@@ -50,7 +50,8 @@ module Eval_Tag (C : ConllType) = struct
      (Float.of_int t.exact)        /. (Float.of_int t.instances))
 
 
-  let update t ref_sentence hyp_sentence =
+  let update t (ref_sentence,ref_start_latvar, ref_stop_latvar)
+      (hyp_sentence,hyp_start_latvar, hyp_stop_latvar) =
     t.total_pos <- t.total_pos + (Array.length ref_sentence);
     let perfect = ref true in
     for i = 0 to (Array.length ref_sentence) - 1 do

@@ -35,13 +35,47 @@ module Feature_Tag = struct
   let is_valid feature_vector_size t =
     t < feature_vector_size
 
-  let get_all_features  htbl feature_vector_size opt_oper sent d =
-    let is_valid i = i > 0 && i < feature_vector_size in
 
-    let pos = C.prediction (Array.unsafe_get sent d) in
-    let ppos = if d = 0 then -1 else C.prediction (Array.unsafe_get sent (d-1)) in
-    let _ : float = T.fill_hash_table  htbl is_valid of_template_valid opt_oper sent d ppos pos in
-    ()
+  let get_uni_features htbl feature_vector_size opt_oper sent i =
+    let is_valid i = i > 0 && i < feature_vector_size in
+    let pos = C.prediction sent.(i) in
+    let lat = C.latent_prediction sent.(i) in
+    T.fill_hash_table_uni_part  htbl is_valid of_template_valid opt_oper sent i pos lat
+
+
+  let get_bi_features htbl feature_vector_size opt_oper sent i =
+    let is_valid i = i > 0 && i < feature_vector_size in
+    let pos = C.prediction sent.(i) in
+    let lat = C.latent_prediction sent.(i) in
+    let ppos = C.prediction sent.(i-1) in
+    let plat = C.latent_prediction sent.(i-1) in
+    T.fill_hash_table_bi_part  htbl is_valid of_template_valid opt_oper sent i ppos plat pos lat
+
+
+  let get_bi_features_first htbl feature_vector_size opt_oper sent plat =
+    let is_valid i = i > 0 && i < feature_vector_size in
+    let pos = C.prediction sent.(0) in
+    let lat = C.latent_prediction sent.(0) in
+    let ppos = C.prediction C.start in
+    T.fill_hash_table_bi_part  htbl is_valid of_template_valid opt_oper sent 0 ppos plat pos lat
+
+
+  let get_bi_features_stop htbl feature_vector_size opt_oper sent lat =
+    let is_valid i = i > 0 && i < feature_vector_size in
+    let pos = C.prediction C.stop in
+    let ppos = C.prediction sent.((Array.length sent)-1) in
+    let plat = C.latent_prediction sent.((Array.length sent)-1) in
+    T.fill_hash_table_bi_part  htbl is_valid of_template_valid opt_oper sent 0 ppos plat pos lat
+
+
+  let get_all_features _h _s _o _r _i = failwith "not implemented yet"
+  (* let get_all_features  htbl feature_vector_size opt_oper sent d = *)
+  (*   let is_valid i = i > 0 && i < feature_vector_size in *)
+
+  (*   let pos = C.prediction (Array.unsafe_get sent d) in *)
+  (*   let ppos = if d = 0 then - 1 else C.prediction (Array.unsafe_get sent (d-1)) in *)
+  (*   let _ : float = T.fill_hash_table  htbl is_valid of_template_valid opt_oper sent d ppos pos in *)
+  (*   () *)
 
 
   let fun_score feature_vector template =
@@ -123,26 +157,26 @@ module Feature_Tag = struct
                 |> T.collect_templates ~only_gold
               )
 
-  let compute_score_difference params refs hyps i refp hypp  =
-    (get_uni_score params refs i (C.prediction refp))
-    +.
-      (if i > 0
-       then (get_bi_score params refs i (C.prediction (Array.unsafe_get refs (i-1))) (C.prediction refp))
-       else (get_bi_score params refs i (C.prediction C.start) (C.prediction refp) ))
-    +. (*not sure about this one*)
-      (if i = (Array.length refs) -1
-       then (get_bi_score params refs (Array.length refs) (C.prediction refp) (C.prediction C.stop))
-       else 0.0)
-    -.
-      (get_uni_score params hyps i (C.prediction hypp))
-    -.
-      (if i > 0
-       then (get_bi_score params hyps i (C.prediction (Array.unsafe_get hyps (i-1))) (C.prediction hypp))
-       else (get_bi_score params hyps i (C.prediction C.start) (C.prediction hypp)))
-    -. (*not sure about this one*)
-      (if i = (Array.length hyps) -1
-       then (get_bi_score params hyps (Array.length hyps) (C.prediction hypp) (C.prediction C.stop))
-       else 0.0)
+  let compute_score_difference params refs hyps i refp hypp  = failwith "not implemented"
+    (* (get_uni_score params refs i (C.prediction refp)) *)
+    (* +. *)
+    (*   (if i > 0 *)
+    (*    then (get_bi_score params refs i (C.prediction (Array.unsafe_get refs (i-1))) (C.prediction refp)) *)
+    (*    else (get_bi_score params refs i (C.prediction C.start) (C.prediction refp) )) *)
+    (* +. (\*not sure about this one*\) *)
+    (*   (if i = (Array.length refs) -1 *)
+    (*    then (get_bi_score params refs (Array.length refs) (C.prediction refp) (C.prediction C.stop)) *)
+    (*    else 0.0) *)
+    (* -. *)
+    (*   (get_uni_score params hyps i (C.prediction hypp)) *)
+    (* -. *)
+    (*   (if i > 0 *)
+    (*    then (get_bi_score params hyps i (C.prediction (Array.unsafe_get hyps (i-1))) (C.prediction hypp)) *)
+    (*    else (get_bi_score params hyps i (C.prediction C.start) (C.prediction hypp))) *)
+    (* -. (\*not sure about this one*\) *)
+    (*   (if i = (Array.length hyps) -1 *)
+    (*    then (get_bi_score params hyps (Array.length hyps) (C.prediction hypp) (C.prediction C.stop)) *)
+    (*    else 0.0) *)
 
 
 

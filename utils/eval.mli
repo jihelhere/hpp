@@ -29,7 +29,7 @@ sig
   (* return Score (or 1 - Loss) and exact match*)
   val to_score : t -> (float * float)
 
-  val update : t -> C.t array -> C.t array -> unit
+  val update : t -> (C.t array*int*int) -> (C.t array*int*int) -> unit
 
   val to_string : t -> string
 

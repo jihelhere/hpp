@@ -28,14 +28,19 @@ struct
       idx        : int;
       form       : int;
       pos        : int;
+      latpos     : int;
       prefix     : int;
       suffix     : int;
     }
 
-  let same_prediction t1 t2 = t1.pos = t2.pos
+  let same_prediction t1 t2 = (t1.pos = t2.pos)
+  let same_fine_prediction t1 t2 = (t1.pos = t2.pos) && (t1.latpos = t2.latpos)
   let prediction t = t.pos
+  let latent_prediction t = t.latpos
+
 
   let set_prediction t i = {t with pos=i}
+  let set_latentprediction t i l = {t with pos=i;latpos=l}
 
   let form_map = Int2StringMap.empty ()
   let pos_map = Int2StringMap.empty ()
@@ -65,7 +70,7 @@ struct
       idx        = int_of_string (get_field 0);
       form       = Int2StringMap.str2int form_map       (get_field 1);
       pos        = Int2StringMap.str2int pos_map (get_field 2);
-
+      latpos     = -1;
       prefix = Int2StringMap.str2int prefix_map (get_string_prefix (get_field 1));
       suffix = Int2StringMap.str2int suffix_map (get_string_suffix (get_field 1));
     }
@@ -74,6 +79,7 @@ struct
   let start = {idx = 0;
               form = Int2StringMap.str2int form_map "__START__";
               pos = Int2StringMap.str2int pos_map "__START__";
+              latpos = -1;
               prefix = Int2StringMap.str2int prefix_map (get_string_prefix "__START__");
               suffix = Int2StringMap.str2int suffix_map (get_string_suffix "__START__");
               }
@@ -81,6 +87,7 @@ struct
   let stop = {idx = 0;
                form = Int2StringMap.str2int form_map "__STOP__";
                pos = Int2StringMap.str2int pos_map "__STOP__";
+               latpos = -1;
                prefix = Int2StringMap.str2int prefix_map (get_string_prefix "__STOP__");
                suffix = Int2StringMap.str2int suffix_map (get_string_suffix "__STOP__");
               }
@@ -88,6 +95,7 @@ struct
   let digit = {idx = 0;
                form = Int2StringMap.str2int form_map "__DIGIT__";
                pos = Int2StringMap.str2int pos_map "__DIGIT__";
+               latpos = -1;
                prefix = Int2StringMap.str2int prefix_map (get_string_prefix "__DIGIT__");
                suffix = Int2StringMap.str2int suffix_map (get_string_suffix "__DIGIT__");
               }
