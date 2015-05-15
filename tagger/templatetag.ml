@@ -269,9 +269,9 @@ module Template_Tag =
     let retrieve_latvar comb =
       comb mod nb_hidden_vars
 
-    let make_template_uni fun_score array_sentence i pos latvar_pos =
 
-      let pos = combine_pos_lat pos latvar_pos in
+
+    let make_template_uni fun_score array_sentence i =
 
       let init = delta (i = 0) in
       let tok = Array.unsafe_get array_sentence i in
@@ -302,6 +302,8 @@ module Template_Tag =
       let nntok = if C.is_digit nntok then C.digit else nntok in
       let nnword = C.get_form_id nntok in
 
+      fun pos lat ->
+        let pos = combine_pos_lat pos lat in
       (* (fun_score (ftt U_Bias pos init)) *)
         0.0
       +. (fun_score (fwtt U_Word word pos init))
@@ -411,9 +413,6 @@ module Template_Tag =
     (*     if ppos = (-1) then 0.0 *)
   (*     else (make_template_bi fun_score sent i ppos pos) *)
 
-
-
-
     let fill_hash_table_uni_part  htbl is_valid template_to_index_fun oper =
       let fun_score t =
         let idx = (template_to_index_fun t) in
@@ -431,6 +430,4 @@ module Template_Tag =
       in
       fun sent i ppos plat pos lat ->
         let _:float = (make_template_bi fun_score sent i ppos plat pos lat) in ()
-
-
   end

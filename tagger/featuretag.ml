@@ -35,27 +35,30 @@ module Feature_Tag = struct
   let is_valid feature_vector_size t =
     t < feature_vector_size
 
-
   let get_uni_features htbl feature_vector_size opt_oper sent i =
     let is_valid i = i > 0 && i < feature_vector_size in
-    let pos = C.prediction sent.(i) in
-    let lat = C.latent_prediction sent.(i) in
+    let tok = (Array.unsafe_get sent i) in
+    let pos = C.prediction tok in
+    let lat = C.latent_prediction tok in
     T.fill_hash_table_uni_part  htbl is_valid of_template_valid opt_oper sent i pos lat
 
 
   let get_bi_features htbl feature_vector_size opt_oper sent i =
     let is_valid i = i > 0 && i < feature_vector_size in
-    let pos = C.prediction sent.(i) in
-    let lat = C.latent_prediction sent.(i) in
-    let ppos = C.prediction sent.(i-1) in
-    let plat = C.latent_prediction sent.(i-1) in
+    let tok = (Array.unsafe_get sent i) in
+    let ptok = (Array.unsafe_get sent (i-1)) in
+    let pos = C.prediction tok in
+    let lat = C.latent_prediction tok  in
+    let ppos = C.prediction ptok  in
+    let plat = C.latent_prediction ptok in
     T.fill_hash_table_bi_part  htbl is_valid of_template_valid opt_oper sent i ppos plat pos lat
 
 
   let get_bi_features_first htbl feature_vector_size opt_oper sent plat =
     let is_valid i = i > 0 && i < feature_vector_size in
-    let pos = C.prediction sent.(0) in
-    let lat = C.latent_prediction sent.(0) in
+    let first = Array.unsafe_get sent 0 in
+    let pos = C.prediction first in
+    let lat = C.latent_prediction first in
     let ppos = C.prediction C.start in
     T.fill_hash_table_bi_part  htbl is_valid of_template_valid opt_oper sent 0 ppos plat pos lat
 
@@ -63,8 +66,9 @@ module Feature_Tag = struct
   let get_bi_features_stop htbl feature_vector_size opt_oper sent lat =
     let is_valid i = i > 0 && i < feature_vector_size in
     let pos = C.prediction C.stop in
-    let ppos = C.prediction sent.((Array.length sent)-1) in
-    let plat = C.latent_prediction sent.((Array.length sent)-1) in
+    let last = Array.unsafe_get sent ((Array.length sent)-1) in
+    let ppos = C.prediction last in
+    let plat = C.latent_prediction last in
     T.fill_hash_table_bi_part  htbl is_valid of_template_valid opt_oper sent 0 ppos plat pos lat
 
 

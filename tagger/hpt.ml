@@ -54,6 +54,7 @@ let train =
           | Some x -> x
         in
 
+        if verbose then printf "verbose mode\n%!" else printf "not verbose mode\n%!";
 
         Trainer.train ~train_filename ~dev_filename ~test_filename
           ~max_iter ~feature_threshold

@@ -43,13 +43,20 @@ struct
     (* first one prints score info : will be called after each training example *)
     (* second one resets eval variables : will be called before each pass *)
     (* third one returns final score *)
-    let eval_task () =
+  let eval_task verbose () =
+
+    let print_count = ref 0 in
+    let print_cond () = if verbose then true
+      else (print_count := !print_count + 1; (!print_count mod 100) = 0)
+    in
       let eval = E.empty in
       let update_stats ref_sent hyp_sent =
         E.update eval ref_sent hyp_sent;
-        Printf.printf "%s\r%!" (E.to_string eval) in
+        if print_cond () then Printf.printf "%s\r%!" (E.to_string eval)
+      in
       let reset_stats () = E.reset eval in
       let final_score () = E.to_score eval |> fst in
+      Printf.printf "%s\r%!" (E.to_string eval);
       (update_stats, reset_stats, final_score)
 
     let train_and_eval feature_weights fun_update
@@ -70,17 +77,17 @@ struct
       final_score ()
 
 
-    let train_epoch ~update_func ~feature_weights ~corpus =
-      train_and_eval feature_weights update_func (eval_task ()) corpus
+    let train_epoch ~update_func ~feature_weights ~corpus ~verbose =
+      train_and_eval feature_weights update_func (eval_task verbose ()) corpus
 
     let dont_update_model = fun _ _ _ -> ()
 
-    let eval_epoch ~feature_weights ~corpus =
-      train_and_eval feature_weights dont_update_model (eval_task ()) corpus
+    let eval_epoch ~feature_weights ~corpus ~verbose =
+      train_and_eval feature_weights dont_update_model (eval_task verbose ()) corpus
 
-    let eval_print_epoch ~filename ~feature_weights ~corpus =
+    let eval_print_epoch ~filename ~feature_weights ~corpus ~verbose =
       let oc = Out_channel.create filename in
-      let (update_stats, reset_stats, final_score) = eval_task ()
+      let (update_stats, reset_stats, final_score) = eval_task verbose ()
       in
       let update_stats_print sentence hypothesis =
         update_stats sentence hypothesis;
@@ -125,7 +132,7 @@ struct
             Printf.printf("\nIteration: %d\nTraining\n%!") epoch
           in
 
-          let (_ : float) = train_epoch ~update_func:(U.update updater max_iter epoch)
+          let (_ : float) = train_epoch ~verbose ~update_func:(U.update updater max_iter epoch)
             ~feature_weights:(U.weights updater)
             ~corpus:train_instances
           in
@@ -137,7 +144,7 @@ struct
             | None -> 0.0
             | Some dis ->
                Printf.printf("\nDev:\n%!");
-               eval_epoch ~feature_weights:average ~corpus:dis
+               eval_epoch ~feature_weights:average ~corpus:dis ~verbose
           in
 
           let train_instances = List.permute train_instances in
@@ -156,8 +163,9 @@ struct
         | Some tis ->
            Printf.printf("\nTest:\n%!");
            eval_print_epoch ~filename:"test.results" (* TODO give a proper filename *)
-                            ~feature_weights:final
-                            ~corpus:tis
+             ~feature_weights:final
+             ~corpus:tis
+             ~verbose
            ;
            Printf.printf("\n%!")
       in
@@ -189,10 +197,10 @@ module PerceptronTrainer(Co : ConllType) (E : Eval with module C = Co) (D : Deco
         (* compute perceptron update*)
       let update  t _ _ _ ref_sentence hyp_sentence =
 
-        let opt_oper oper = function
-          | None -> Some (oper 0 1) (* init: +/- 1 *)
-          | Some x -> Some (oper x 1) (* update: x +/- 1 *)
-        in
+        (* let opt_oper oper = function *)
+        (*   | None -> Some (oper 0 1) (\* init: +/- 1 *\) *)
+        (*   | Some x -> Some (oper x 1) (\* update: x +/- 1 *\) *)
+        (* in *)
 
 
         let htbl = Hashtbl.create ~hashable:Int.hashable () in

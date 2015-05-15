@@ -48,30 +48,37 @@ struct
     let pos_incr =                                  nb_hv in
 
 
-    let rec fill_hyp_scores i i_offset pos pos_offset lat lat_offset  =
-      let rec iter_previous i pos lat offset uni_score ppos plat ppos_offset plat_offset=
-        if plat >= nb_hv then iter_previous i pos lat offset uni_score (ppos+1) 0 (ppos_offset+ppos_incr) 0
-        else
-          if ppos >= nb_labels then ()
-          else
-            let bi_score = if (i > 0) || (ppos = C.prediction C.start)
-              then F.get_bi_score params sent i ppos plat pos lat
-              else 0.0 in
-            Array.unsafe_set hyp_scores (offset + ppos_offset + plat_offset) (uni_score +. bi_score);
-            iter_previous i pos lat offset uni_score ppos (plat+1) ppos_offset (plat_offset+plat_incr)
-      in
-      if lat >= nb_hv then fill_hyp_scores i i_offset (pos+1) (pos_offset+pos_incr) 0 0
+    let rec iter_previous i pos lat offset uni_score bi_score_fun ppos plat ppos_offset plat_offset=
+      if plat >= nb_hv then iter_previous i pos lat offset uni_score bi_score_fun (ppos+1) 0 (ppos_offset+ppos_incr) 0
       else
-        if pos >= nb_labels then fill_hyp_scores (i+1) (i_offset+i_incr) 0 0 0 0
+        if ppos >= nb_labels then ()
         else
-          if i >= n then ()
-          else
-            let uni_score = F.get_uni_score params sent i pos lat in
-            let offset = i_offset + pos_offset + lat_offset in
-            iter_previous i pos lat offset uni_score 0 0 0 0;
-            fill_hyp_scores i i_offset pos pos_offset (lat+1) (lat_offset+1)
+          let bi_score = if (i > 0) || (ppos = C.prediction C.start)
+            then bi_score_fun ppos plat pos lat
+            else 0.0 in
+          Array.unsafe_set hyp_scores (offset + ppos_offset + plat_offset) (uni_score +. bi_score);
+          iter_previous i pos lat offset uni_score bi_score_fun ppos (plat+1) ppos_offset (plat_offset+plat_incr)
     in
-    let () = fill_hyp_scores 0 0 0 0 0 0 in
+
+    let rec iter_current i pos lat offset uni_score_fun bi_score_fun pos_offset lat_offset=
+      if lat >= nb_hv then iter_current i (pos+1) 0 offset uni_score_fun bi_score_fun (pos_offset+pos_incr) 0
+      else
+        if pos >= nb_labels then ()
+        else
+          let uni_score = uni_score_fun pos lat in
+          iter_previous i pos lat (offset + pos_offset + lat_offset) uni_score bi_score_fun 0 0 0 0;
+          iter_current i pos (lat+1) offset uni_score_fun bi_score_fun pos_offset (lat_offset+1)
+    in
+
+    let rec fill_hyp_scores i i_offset  =
+      if i >= n then ()
+      else
+        let uni_score_fun = F.get_uni_score params sent i in
+        let bi_score_fun  = F.get_bi_score params sent i in
+        iter_current i 0 0 i_offset uni_score_fun bi_score_fun 0 0;
+        fill_hyp_scores (i+1) (i_offset+i_incr)
+    in
+    let () = fill_hyp_scores 0 0 in
 
 
   (*best path scores*)
@@ -289,8 +296,10 @@ struct
 
 
 
-  let get_feature_differences htbl size (ref_sent,rfl,rel) (hyp_sent,hfl,hel) =
-    let _t = size + 1 in
+  let get_feature_differences (htbl : (int,int) Hashtbl.t)
+      (size : int) (ref_sent, (rfl : int), (rel : int)) (hyp_sent,hfl,hel) =
+
+
     let rec loop_on_seq i =
       if i < Array.length ref_sent
       then
@@ -302,30 +311,28 @@ struct
               F.get_uni_features  htbl size (opt_oper (-)) hyp_sent i
             )
           else ();
-          if i > 0
+          if i > 0 && ((not (C.same_fine_prediction ref_sent.(i) hyp_sent.(i)))
+                       || (not (C.same_fine_prediction ref_sent.(i-1) hyp_sent.(i-1))))
           then
-            if (not (C.same_fine_prediction ref_sent.(i) hyp_sent.(i)))
-              || (not (C.same_fine_prediction ref_sent.(i-1) hyp_sent.(i-1)))
-            then
-              (
-                F.get_bi_features  htbl size (opt_oper (+)) ref_sent i;
-                F.get_bi_features  htbl size (opt_oper (-)) hyp_sent i
-              )
-            else ()
-          else (* i = 0*)
-            if rfl <> hfl || (not (C.same_fine_prediction ref_sent.(0) hyp_sent.(0)))
-            then
-              (
-                F.get_bi_features_first  htbl size (opt_oper (+)) ref_sent rfl;
-                F.get_bi_features_first  htbl size (opt_oper (-)) hyp_sent hfl
-              )
-            else ()
-
+            (
+              F.get_bi_features  htbl size (opt_oper (+)) ref_sent i;
+              F.get_bi_features  htbl size (opt_oper (-)) hyp_sent i
+            )
+          else ()
 
         in
         loop_on_seq (i+1)
     in
     let () = loop_on_seq 0 in
+
+    if rfl <> hfl || (not (C.same_fine_prediction ref_sent.(0) hyp_sent.(0)))
+    then
+      (
+        F.get_bi_features_first  htbl size (opt_oper (+)) ref_sent rfl;
+        F.get_bi_features_first  htbl size (opt_oper (-)) hyp_sent hfl
+      )
+    else ();
+
     if rel <> hel
     then
       (
