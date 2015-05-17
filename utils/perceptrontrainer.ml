@@ -145,20 +145,22 @@ struct
             ~corpus:train_instances
           in
 
-          let average = U.average updater in
+          (* let average = U.average updater in *)
 
           let dev_score =
             match dev_instances with
             | None -> 0.0
             | Some dis ->
                Printf.printf("\nDev:\n%!");
-               eval_epoch ~feature_weights:average ~corpus:dis ~verbose
+              eval_epoch ~feature_weights:(* average *) (U.weights updater)
+                ~corpus:dis ~verbose
           in
 
           let train_instances = List.permute train_instances in
           (* made any progress ? *)
           if dev_score >= best_score
-          then main_loop train_instances average dev_score (epoch+1)
+          then main_loop train_instances (* average *) (U.weights updater)
+            dev_score (epoch+1)
           else main_loop train_instances best best_score (epoch+1)
 
       in
