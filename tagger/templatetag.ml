@@ -27,7 +27,7 @@ module Template_Tag =
 
     module C = Conll_Tag
 
-    let nb_hidden_vars = 4
+    let nb_hidden_vars = 2
 
     module T = struct
       type t = int with sexp
@@ -272,7 +272,6 @@ module Template_Tag =
 
 
     let make_template_uni fun_score array_sentence i =
-
       let init = delta (i = 0) in
       let tok = Array.unsafe_get array_sentence i in
       let tok = if C.is_digit tok then C.digit else tok in
@@ -291,7 +290,6 @@ module Template_Tag =
       let pptok = if C.is_digit pptok then C.digit else pptok in
       let ppword = C.get_form_id pptok in
 
-
       let ntok = if i >= (Array.length array_sentence) - 1 then C.stop else Array.unsafe_get array_sentence (i+1) in
       let ntok = if C.is_digit ntok then C.digit else ntok in
       let nword = C.get_form_id ntok in
@@ -304,8 +302,8 @@ module Template_Tag =
 
       fun pos lat ->
         let pos = combine_pos_lat pos lat in
-      (* (fun_score (ftt U_Bias pos init)) *)
         0.0
+      +. (fun_score (ftt U_Bias pos init))
       +. (fun_score (fwtt U_Word word pos init))
       +. (fun_score (fwtt U_Pref pref pos init))
       +. (fun_score (fwtt U_Suf suf  pos init))
@@ -321,19 +319,27 @@ module Template_Tag =
       let ppos = combine_pos_lat ppos latvar_ppos in
       let pos  = combine_pos_lat pos latvar_pos in
 
-      (* 0.0 *)
       let init = delta (i = 0) in
       let tok = if i >= Array.length array_sentence then C.stop else Array.unsafe_get array_sentence i in
       (* let tok = if C.is_digit tok then C.digit else tok in *)
       let word = C.get_form_id tok in
       (* let pref = C.get_prefix_id tok in *)
       (* let suf = C.get_suffix_id tok in *)
-      (* (fun_score (fttt B_Bias ppos pos init)) *)
-0.0      +. (fun_score (ftt B_PPos ppos init))
+      0.0
+    (*   +. (fun_score (ftt B_Bias ppos pos)) *)
+    (*   +. (fun_score (ft B_PPos ppos)) *)
+    (*   +. (fun_score (fwt B_PPos_Word word ppos)) *)
+    (*   +. (fun_score (fwtt B_Word word ppos pos)) *)
+    (*   (\* +. (fun_score (fwtt B_Pref pref ppos pos)) *\) *)
+    (* (\* +. (fun_score (fwtt B_Suf suf  ppos pos)) *\) *)
+
+      +. (fun_score (fttt B_Bias ppos pos init))
+      +. (fun_score (ftt B_PPos ppos init))
       +. (fun_score (fwtt B_PPos_Word word ppos init))
       +. (fun_score (fwttt B_Word word ppos pos init))
       (* +. (fun_score (fwttt B_Pref pref ppos pos init)) *)
       (* +. (fun_score (fwttt B_Suf suf  ppos pos init)) *)
+
 
     let of_int t = t
 

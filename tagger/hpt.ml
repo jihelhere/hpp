@@ -43,10 +43,14 @@ let train =
       +> flag "-n" (optional_with_default 5 int)  ~doc: "int Feature threshold"
       +> flag "-m" (required file) ~doc: "filename Output model name"
       +> flag "-a" (optional_with_default "mira" string) ~doc: "string Trainer name : \"perceptron\" or \"mira\" [default]"
+      +> flag "-r" (no_arg) ~doc: " Random initialization of weight vector"
+      +> flag "-g" (optional_with_default (-1) int) ~doc: "int Restart from average frequency (negative is never)"
       +> flag "-v" (no_arg) ~doc: " Verbose mode"
     )
     (fun train_filename dev_filename test_filename
-      max_iter feature_threshold model algo verbose () ->
+      max_iter feature_threshold model algo
+      random_init restart_freq
+      verbose () ->
 
         let (module Trainer : OnlineTrainer) =
           match Hashtbl.find trainer_table algo with
@@ -57,7 +61,7 @@ let train =
         if verbose then printf "verbose mode\n%!" else printf "not verbose mode\n%!";
 
         Trainer.train ~train_filename ~dev_filename ~test_filename
-          ~max_iter ~feature_threshold
+          ~max_iter ~feature_threshold ~random_init ~restart_freq
           ~verbose
         |> Model.make
         |> Model.save ~filename:model

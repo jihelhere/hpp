@@ -29,6 +29,8 @@ sig
       test_filename:string option ->
       max_iter:int ->
       feature_threshold:int ->
+      random_init:bool ->
+      restart_freq:int ->
       verbose:bool ->
       float array
     val name : string

@@ -26,10 +26,12 @@ module type Updater =
 sig
     module C : ConllType
     type t
-    val create : total:int -> size:int -> t
+    val create : random_init:bool -> total:int -> size:int -> t
     val update :  t -> int -> int -> int -> (C.t array*int*int) ->  (C.t array*int*int)  -> unit
     val weights : t -> float array
     val average : t -> float array
+
+    val reinit_from_average : t -> unit
   end
 
 module OnlineMarginTrainer
@@ -55,8 +57,7 @@ struct
         if print_cond () then Printf.printf "%s\r%!" (E.to_string eval)
       in
       let reset_stats () = E.reset eval in
-      let final_score () = E.to_score eval |> fst in
-      Printf.printf "%s\r%!" (E.to_string eval);
+      let final_score () =  Printf.printf "%s\n%!" (E.to_string eval); E.to_score eval |> fst in
       (update_stats, reset_stats, final_score)
 
     let train_and_eval feature_weights fun_update
@@ -102,8 +103,10 @@ struct
       Out_channel.close oc
 
 
-    let train  ~train_filename ~dev_filename ~test_filename ~
-               max_iter ~feature_threshold ~verbose =
+    let train  ~train_filename ~dev_filename ~test_filename
+        ~max_iter ~feature_threshold
+        ~random_init ~restart_freq
+        ~verbose =
 
 
 
@@ -123,7 +126,7 @@ struct
 
       (* Initialize feature arrays *)
       let best_feature_vector = Array.create ~len:size 0.0 in
-      let updater = U.create ~total:(List.length train_instances) ~size in
+      let updater = U.create ~random_init ~total:(List.length train_instances) ~size in
 
       let rec main_loop train_instances best best_score epoch =
         if epoch > max_iter then best
@@ -132,7 +135,12 @@ struct
             Printf.printf("\nIteration: %d\nTraining\n%!") epoch
           in
 
-          let (_ : float) = train_epoch ~verbose ~update_func:(U.update updater max_iter epoch)
+          let () =
+            if (restart_freq > 0) && (epoch mod restart_freq = 0)
+            then U.reinit_from_average updater
+          in
+          let (_ : float) = train_epoch ~verbose
+            ~update_func:(U.update updater max_iter epoch)
             ~feature_weights:(U.weights updater)
             ~corpus:train_instances
           in
@@ -186,9 +194,24 @@ module PerceptronTrainer(Co : ConllType) (E : Eval with module C = Co) (D : Deco
 
       module C = Co
 
-      let create ~total:_ ~size = { size = size; counter = 0;
-                                    weights = Array.create ~len:size 0.0;
-                                    average_weights = Array.create ~len:size 0.0}
+      let create ~random_init ~total:_ ~size =
+        let w = Array.create ~len:size 0.0 in
+        let () = if random_init
+          then
+            begin
+              for i = 0 to (size/2) - 1 do
+                let f = Random.float 1e-4 in
+                Array.unsafe_set w i f;
+                Array.unsafe_set w (size-i) (-.f)
+              done;
+              Array.permute w
+            end
+          else ()
+        in
+        { size = size; counter = 0;
+          weights = w;
+          average_weights = Array.create ~len:size 0.0
+        }
 
 
 
@@ -220,8 +243,14 @@ module PerceptronTrainer(Co : ConllType) (E : Eval with module C = Co) (D : Deco
       let average t =
         Array.init t.size ~f:(fun i -> t.weights.(i) -. (t.average_weights.(i) /. (Float.of_int t.counter)))
 
-      let weights t =
-        t.weights
+      let weights t = t.weights
+
+      let reinit_from_average t =
+        let a = average t in
+        Array.iteri a
+          ~f:(fun i f -> Array.unsafe_set t.weights i f)
+
+
       end
 
     include OnlineMarginTrainer(Co)(E)(UpdatePerceptron)(D)
@@ -242,7 +271,7 @@ module MiraTrainer (Co : ConllType) (E : Eval with module C = Co) (D : Decoder w
                   weights: float Array.t;
                   average_weights: float Array.t;
                   clip: float;}
-        let create ~total ~size = { size = size;
+        let create ~random_init:_ ~total ~size = { size = size;
                                     counter = 0;
                                     examples = total;
                                     weights = Array.create ~len:size 0.0;
@@ -317,6 +346,12 @@ module MiraTrainer (Co : ConllType) (E : Eval with module C = Co) (D : Decoder w
 
         let average t = Array.copy t.average_weights
         let weights t = t.weights
+
+      let reinit_from_average t =
+        let a = average t in
+        Array.iteri a
+          ~f:(fun i f -> Array.unsafe_set t.weights i f)
+
       end
     include OnlineMarginTrainer(Co)(E)(UpdateOneBestMira)(D)
 
@@ -332,6 +367,8 @@ module type OnlineTrainer =
       test_filename: string option ->
       max_iter:int ->
       feature_threshold:int ->
+      random_init:bool ->
+      restart_freq:int ->
       verbose:bool ->
       float array
     val name : string
