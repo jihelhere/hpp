@@ -32,7 +32,8 @@ struct
   module F = Feature_Tag
   module Feature = F
 
-  let decode params sent =
+
+  let decode params (pruner,poslist) sent =
 
     (* let () = printf "entering decode\n%!" in *)
     let nb_labels = C.get_number_pos () in
@@ -40,97 +41,141 @@ struct
     let n = Array.length sent in
 
     (*build uni/bi scores*)
-    let hyp_scores = Array.create ~len:(n*nb_labels*nb_labels*nb_hv*nb_hv) 0.0 in
+    let hyp_scores = Array.create ~len:(n*nb_labels*nb_labels*nb_hv*nb_hv) Float.neg_infinity in
 
     let i_incr =    nb_labels * nb_hv * nb_labels * nb_hv in
     let ppos_incr =             nb_hv * nb_labels * nb_hv in
     let plat_incr =                     nb_labels * nb_hv in
     let pos_incr =                                  nb_hv in
 
-
-    let rec iter_previous i pos lat offset uni_score bi_score_fun ppos plat ppos_offset plat_offset=
-      if plat >= nb_hv then iter_previous i pos lat offset uni_score bi_score_fun (ppos+1) 0 (ppos_offset+ppos_incr) 0
-      else
-        if ppos >= nb_labels then ()
-        else
-          let bi_score = if (i > 0) || (ppos = C.prediction C.start)
-            then bi_score_fun ppos plat pos lat
-            else 0.0 in
-          Array.unsafe_set hyp_scores (offset + ppos_offset + plat_offset) (uni_score +. bi_score);
-          iter_previous i pos lat offset uni_score bi_score_fun ppos (plat+1) ppos_offset (plat_offset+plat_incr)
+    let sent_valid_tags = Array.map sent ~f:(fun tok ->
+      let f = C.get_form_id tok in
+      if f < (Array.length pruner) && (Array.unsafe_get pruner f) <> []
+      then Array.unsafe_get pruner f
+      else poslist)
     in
 
-    let rec iter_current i pos lat offset uni_score_fun bi_score_fun pos_offset lat_offset=
-      if lat >= nb_hv then iter_current i (pos+1) 0 offset uni_score_fun bi_score_fun (pos_offset+pos_incr) 0
+    let rec iter_previous i pos lat offset uni_score bi_score_fun ppos_list plat =
+      match ppos_list with
+      | [] -> ()
+      | ppos::rest ->
+      if plat >= nb_hv then iter_previous i pos lat offset uni_score bi_score_fun rest 0
       else
-        if pos >= nb_labels then ()
-        else
-          let uni_score = uni_score_fun pos lat in
-          iter_previous i pos lat (offset + pos_offset + lat_offset) uni_score bi_score_fun 0 0 0 0;
-          iter_current i pos (lat+1) offset uni_score_fun bi_score_fun pos_offset (lat_offset+1)
+        let ppos_offset = ppos * ppos_incr in
+        let plat_offset = plat * plat_incr in
+        let bi_score = bi_score_fun ppos plat pos lat in
+        Array.unsafe_set hyp_scores (offset + ppos_offset + plat_offset) (uni_score +. bi_score);
+        iter_previous i pos lat offset uni_score bi_score_fun ppos_list (plat+1)
     in
 
-    let rec fill_hyp_scores i i_offset  =
+    let rec iter_current i valid_pos_list lat offset uni_score_fun bi_score_fun =
+      match valid_pos_list with
+      | [] -> ()
+      | pos::rest ->
+      if lat >= nb_hv then iter_current i rest 0 offset uni_score_fun bi_score_fun
+      else
+        let pos_offset = pos * pos_incr in
+        let lat_offset = lat in
+        let uni_score = uni_score_fun pos lat in
+
+        let left_valid_pos_list = (* poslist *)
+          if i = 0 then [C.prediction C.start]
+          else Array.unsafe_get sent_valid_tags (i-1)
+        in
+        iter_previous i pos lat (offset + pos_offset + lat_offset) uni_score bi_score_fun left_valid_pos_list 0;
+        iter_current i valid_pos_list (lat+1) offset uni_score_fun bi_score_fun
+    in
+
+    let rec fill_hyp_scores i=
       if i >= n then ()
       else
+        let i_offset = i * i_incr in
         let uni_score_fun = F.get_uni_score params sent i in
         let bi_score_fun  = F.get_bi_score params sent i in
-        iter_current i 0 0 i_offset uni_score_fun bi_score_fun 0 0;
-        fill_hyp_scores (i+1) (i_offset+i_incr)
+
+        let valid_pos_list = (* poslist *)
+          Array.unsafe_get sent_valid_tags i
+        in
+        iter_current i valid_pos_list 0 i_offset uni_score_fun bi_score_fun;
+        fill_hyp_scores (i+1)
     in
-    let () = fill_hyp_scores 0 0 in
+    let () = fill_hyp_scores 0 in
 
 
   (*best path scores*)
-    let path_scores = Array.create ~len:(n*nb_labels*nb_hv) 0.0 in
+    let path_scores = Array.create ~len:(n*nb_labels*nb_hv) Float.neg_infinity in
   (* backpointers*)
     let bp = Array.create ~len:(n*nb_labels*nb_hv) (-1,-1) in
 
     (* fill score chart (partial paths score) + backpointers *)
-    let rec find_best_transition i pos lat ppos plat  bst_score bst_ppos bst_plat =
-      if ppos >= nb_labels then (bst_score,bst_ppos,bst_plat)
-      else
-        if plat >= nb_hv then find_best_transition i pos lat (ppos+1) 0 bst_score bst_ppos bst_plat
+    let rec find_best_transition i pos lat ppos_list plat  bst_score bst_ppos bst_plat =
+      match ppos_list with
+      | [] -> (bst_score,bst_ppos,bst_plat)
+      | ppos::rest ->
+        if plat >= nb_hv then find_best_transition i pos lat rest 0 bst_score bst_ppos bst_plat
         else
           let cur_score = Array.unsafe_get hyp_scores
             (i * i_incr + ppos * ppos_incr + plat * plat_incr + pos * pos_incr + lat) +.
             if i > 0 then Array.unsafe_get path_scores ( (i-1)*nb_labels * nb_hv + ppos * nb_hv + plat)
             else 0.0 in
           if cur_score > bst_score
-          then find_best_transition i pos lat ppos (plat+1)  cur_score ppos plat
-          else find_best_transition i pos lat ppos (plat+1)  bst_score bst_ppos bst_plat
+          then find_best_transition i pos lat ppos_list (plat+1)  cur_score ppos plat
+          else find_best_transition i pos lat ppos_list (plat+1)  bst_score bst_ppos bst_plat
+     in
+
+    let rec fill_path_scores_current i valid_pos_list lat =
+      match valid_pos_list with
+      | [] -> ()
+      | pos::rest ->
+         if lat >= nb_hv then fill_path_scores_current i rest 0
+         else
+           let left_valid_pos_list = (* poslist *)
+             if i = 0 then [C.prediction C.start]
+             else Array.unsafe_get sent_valid_tags (i-1)
+           in
+
+           let bst_score,bst_ppos,bst_plat = find_best_transition i pos lat left_valid_pos_list 0 Float.neg_infinity (-1) (-1) in
+           Array.unsafe_set path_scores (i*nb_labels*nb_hv + pos*nb_hv + lat) bst_score;
+           Array.unsafe_set bp (i*nb_labels*nb_hv + pos*nb_hv + lat ) (bst_ppos,bst_plat);
+        fill_path_scores_current i valid_pos_list (lat+1)
     in
-    let rec fill_path_scores i pos lat =
-      if lat >= nb_hv then fill_path_scores i (pos+1) 0
+    let rec fill_path_scores i =
+      if i >= n then ()
       else
-        if pos >= nb_labels then fill_path_scores (i+1) 0 0
-        else
-          if i >= n then ()
-          else
-            let bst_score,bst_ppos,bst_plat = find_best_transition i pos lat 0 0 Float.neg_infinity (-1) (-1) in
-            Array.unsafe_set path_scores (i*nb_labels*nb_hv + pos*nb_hv + lat) bst_score;
-            Array.unsafe_set bp (i*nb_labels*nb_hv + pos*nb_hv + lat ) (bst_ppos,bst_plat);
-            fill_path_scores i pos (lat+1)
-    in fill_path_scores 0 0 0;
+        let valid_pos_list = (* poslist *)
+          Array.unsafe_get sent_valid_tags i
+        in
+        fill_path_scores_current i valid_pos_list 0;
+        fill_path_scores (i+1)
+    in
+    fill_path_scores 0;
+
+
 
     (* compute path scores (add the missing POS -> STOP edge) *)
-    let rec find_best_final_transition n stop_pos stop_lat ppos plat bst_score bst_ppos bst_plat bst_lat =
-      if stop_lat >= nb_hv then (bst_score,bst_ppos,bst_plat,bst_lat)
-      else
-        if ppos >= nb_labels then find_best_final_transition n stop_pos (stop_lat+1) 0 0 bst_score bst_ppos bst_plat bst_lat
-      else
-        if plat >= nb_hv then find_best_final_transition n stop_pos stop_lat (ppos+1) 0 bst_score bst_ppos bst_plat bst_lat
-        else
-          let cur_score = if n > 1
-            then Array.unsafe_get path_scores ((n-1)*nb_labels * nb_hv + ppos * nb_hv + plat)
-            else 0.0 in
-          let cur_score = cur_score +. F.get_bi_score params sent n ppos plat stop_pos stop_lat in
-          if cur_score > bst_score
-          then find_best_final_transition n stop_pos stop_lat ppos (plat+1) cur_score ppos plat stop_lat
-          else find_best_final_transition n stop_pos stop_lat ppos (plat+1) bst_score bst_ppos bst_plat bst_lat
+    let rec find_best_final_transition n stop_pos stop_lat ppos_list plat bst_score bst_ppos bst_plat bst_lat =
+      match ppos_list with
+      | [] -> (bst_score,bst_ppos,bst_plat,bst_lat)
+      | ppos::rest ->
+         if stop_lat >= nb_hv
+         then find_best_final_transition n stop_pos 0 rest 0 bst_score bst_ppos bst_plat bst_lat
+         else
+           if plat >= nb_hv then find_best_final_transition n stop_pos (stop_lat+1) ppos_list 0 bst_score bst_ppos bst_plat bst_lat
+           else
+             let cur_score = if n > 1
+               then Array.unsafe_get path_scores ((n-1)*nb_labels * nb_hv + ppos * nb_hv + plat)
+               else 0.0 in
+             let cur_score = cur_score +. F.get_bi_score params sent n ppos plat stop_pos stop_lat in
+             if cur_score > bst_score
+             then find_best_final_transition n stop_pos stop_lat ppos_list (plat+1) cur_score ppos plat stop_lat
+             else find_best_final_transition n stop_pos stop_lat ppos_list (plat+1) bst_score bst_ppos bst_plat bst_lat
     in
 
-    let _,bst_ppos,bst_plat, bst_lat = find_best_final_transition n (C.prediction C.stop) 0 0 0 Float.neg_infinity (-1) (-1) (-1) in
+    let ppos_list = Array.unsafe_get sent_valid_tags (n-1)
+    in
+
+    let _,bst_ppos,bst_plat, bst_lat =
+      find_best_final_transition n (C.prediction C.stop) 0 ppos_list 0 Float.neg_infinity (-1) (-1) (-1) in
 
     (* set last pos from previous iteration *)
     let output = Array.copy sent in
@@ -271,7 +316,7 @@ struct
 
 
 
-  let decode_corpus ~filename ~feature_weights ~corpus ~verbose =
+  let decode_corpus ~filename ~feature_weights ~corpus ~verbose ~pruner =
     let decode_func = decode  feature_weights in
     let oc = Out_channel.create filename in
     let t1 = Time.now () in
@@ -279,7 +324,7 @@ struct
       List.iter (C.corpus_to_list corpus)
         ~f:(fun s ->
           let ref_a = C.prepare_sentence_for_decoder s in
-          let (hyp_a,lat_start,lat_stop) = decode_func ref_a in
+          let (hyp_a,lat_start,lat_stop) = decode_func pruner ref_a in
           Array.iter hyp_a ~f:(fun tok -> Printf.fprintf oc "%s\n" (C.to_string tok));
           fprintf oc "\n"
         ) in

@@ -86,7 +86,7 @@ let predict =
 
      Sequence_Decoder.decode_corpus
        ~filename:output_fname ~feature_weights ~corpus
-       ~verbose
+       ~verbose ~pruner:([||],[])
     )
 
 let command =

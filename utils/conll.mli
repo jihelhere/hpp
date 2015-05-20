@@ -30,4 +30,8 @@ sig
 
     val do_read_file : string -> corpus
     val corpus_to_list : corpus -> sentence list
+
+    val collect_word_tags : sentence list -> int list array
+    val collect_unk_tags :  unit  -> int list
+
 end

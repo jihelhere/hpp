@@ -25,12 +25,16 @@ struct
 
   type t =
     {
-      idx        : int;
       form       : int;
       pos        : int;
       latpos     : int;
       prefix     : int;
       suffix     : int;
+      has_digit  : bool;
+      has_uppercase : bool;
+      has_hyphen  : bool;
+      prefix_list : int list;
+      suffix_list : int list;
     }
 
   let same_prediction t1 t2 = (t1.pos = t2.pos)
@@ -45,83 +49,129 @@ struct
   let form_map = Int2StringMap.empty ()
   let pos_map = Int2StringMap.empty ()
 
-
   (* TODO: command line argument to set this *)
-  let prefix_length = 1
-  let suffix_length = 3
+  let prefix_length = 4
+  let suffix_length = 4
 
   let prefix_map = Int2StringMap.empty ()
   let suffix_map = Int2StringMap.empty ()
 
   let get_number_form () = Int2StringMap.get_size form_map
-  let get_number_pos () = Int2StringMap.get_size pos_map
+  (* let get_number_pos () = Int2StringMap.get_size pos_map *)
 
   let get_string_prefix string = String.prefix string prefix_length
   let get_string_suffix string = String.prefix string suffix_length
 
 
+  let p_has_hyphen t = String.contains t '-'
+  let p_has_digit t =  List.exists ['0';'1';'2';'3';'4';'5';'6';'7';'8';'9'] ~f:(fun e -> String.contains t e)
+  let p_has_uppercase t = not (String.lowercase t = t)
+
+  let p_extract_pref str =
+    let rec aux str len acc =
+      if len > prefix_length then acc
+      else aux str (len+1) ((String.prefix str len)::acc)
+    in
+    aux str 1 []
+
+
+  let p_extract_suf str =
+    let rec aux str len acc =
+      if len > suffix_length then acc
+      else aux str (len+1) ((String.suffix str len)::acc)
+    in
+    aux str 1 []
+
+
+  let separator_regex = Regex.create_exn "\t"
+
   let line_to_conll_token line =
-    let lt = Regex.split (Regex.create_exn "\t") line in
+    let lt = Regex.split separator_regex line in
+    (* let lt = String.split line ~on:'\t' in *)
     let get_field n = match (List.nth lt n) with
       | None -> failwith "missing field"
       | (Some v) -> v
     in
+    let form = get_field 1 in
     {
-      idx        = int_of_string (get_field 0);
-      form       = Int2StringMap.str2int form_map       (get_field 1);
+      form       = Int2StringMap.str2int form_map  (String.lowercase form);
       pos        = Int2StringMap.str2int pos_map (get_field 2);
       latpos     = -1;
-      prefix = Int2StringMap.str2int prefix_map (get_string_prefix (get_field 1));
-      suffix = Int2StringMap.str2int suffix_map (get_string_suffix (get_field 1));
+      prefix = Int2StringMap.str2int prefix_map (get_string_prefix form);
+      suffix = Int2StringMap.str2int suffix_map (get_string_suffix form);
+      has_digit = p_has_digit form;
+      has_uppercase = p_has_uppercase form;
+      has_hyphen = p_has_hyphen form;
+      prefix_list = List.map (p_extract_pref form) ~f:(fun s -> Int2StringMap.str2int prefix_map s);
+      suffix_list = List.map (p_extract_suf form)  ~f:(fun s -> Int2StringMap.str2int suffix_map s);
     }
 
 
-  let start = {idx = 0;
+  let start = {
               form = Int2StringMap.str2int form_map "__START__";
               pos = Int2StringMap.str2int pos_map "__START__";
               latpos = -1;
               prefix = Int2StringMap.str2int prefix_map (get_string_prefix "__START__");
               suffix = Int2StringMap.str2int suffix_map (get_string_suffix "__START__");
+              has_digit = false;
+              has_uppercase = false;
+              has_hyphen = false;
+              prefix_list = List.map (p_extract_pref "__START__") ~f:(fun s -> Int2StringMap.str2int prefix_map s);
+              suffix_list = List.map (p_extract_suf "__START__")  ~f:(fun s -> Int2StringMap.str2int suffix_map s);
               }
 
-  let stop = {idx = 0;
+  let stop = {
                form = Int2StringMap.str2int form_map "__STOP__";
                pos = Int2StringMap.str2int pos_map "__STOP__";
                latpos = -1;
                prefix = Int2StringMap.str2int prefix_map (get_string_prefix "__STOP__");
                suffix = Int2StringMap.str2int suffix_map (get_string_suffix "__STOP__");
+               has_digit = false;
+              has_uppercase = false;
+              has_hyphen = false;
+              prefix_list = List.map (p_extract_pref "__STOP__") ~f:(fun s -> Int2StringMap.str2int prefix_map s);
+              suffix_list = List.map (p_extract_suf "__STOP__")  ~f:(fun s -> Int2StringMap.str2int suffix_map s);
               }
 
-  let digit = {idx = 0;
+  let digit = {
                form = Int2StringMap.str2int form_map "__DIGIT__";
                pos = Int2StringMap.str2int pos_map "__DIGIT__";
                latpos = -1;
                prefix = Int2StringMap.str2int prefix_map (get_string_prefix "__DIGIT__");
                suffix = Int2StringMap.str2int suffix_map (get_string_suffix "__DIGIT__");
+               has_digit = false;
+               has_uppercase = false;
+               has_hyphen = false;
+               prefix_list = List.map (p_extract_pref "__DIGIT__") ~f:(fun s -> Int2StringMap.str2int prefix_map s);
+               suffix_list = List.map (p_extract_suf "__DIGIT__")  ~f:(fun s -> Int2StringMap.str2int suffix_map s);
               }
 
 
-  let get_idx t = t.idx
+  let get_idx _t = 0
   let get_form t = Int2StringMap.int2str form_map t.form
   let get_pos t = Int2StringMap.int2str pos_map t.pos
 
-  let get_form_id t = t.form
-  let get_pos_id t = t.pos
+  (* let get_form_id t = t.form *)
+  (* let get_pos_id t = t.pos *)
 
-  let get_prefix_id t = t.suffix
-  let get_suffix_id t = t.suffix
+  (* let get_prefix_id t = t.prefix *)
+  (* let get_suffix_id t = t.suffix *)
 
   let get_form_id t = t.form
   let get_pos_id t = t.pos
   let get_prefix_id t = t.prefix
   let get_suffix_id t = t.suffix
 
+  let get_prefix_list t = t.prefix_list
+  let get_suffix_list t = t.suffix_list
+
+
+
   let get_number_form () = Int2StringMap.get_size form_map
   let get_number_pos () = Int2StringMap.get_size pos_map
 
   let to_string t =
-    Printf.sprintf "%d\t%s\t%s"
-      (get_idx t)
+    Printf.sprintf "%s\t%s"
       (get_form t)
       (get_pos t)
 
@@ -185,15 +235,15 @@ struct
 
 
   let do_read_file_unordered file =
-    let i = ref 0 in
+    (* let i = ref 0 in *)
     fst (In_channel.with_file file ~f:
                               (fun ic ->
                                In_channel.fold_lines ic ~init:([],[])
                                                      ~f:(fun (acc_corpus,acc_sent) line ->
                                                          if line = ""
                                                          then
-                                                           let _ = i := !i + 1 in
-                                                           let _ = Printf.printf "Loading %d sentences\r%!" !i in
+                                                           (* let _ = i := !i + 1 in *)
+                                                           (* let _ = Printf.printf "Loading %d sentences\r%!" !i in *)
                                                            (acc_sent::acc_corpus, [])
                                                          else (acc_corpus, (line_to_conll_token line)::acc_sent))
                               )
@@ -218,6 +268,52 @@ struct
       )
 
 
+  let collect_unk_tags () =
+    let i = get_number_pos () in
+    let rec incr i acc =
+      if i < 0 then acc
+      else incr (i-1) (i::acc)
+    in
+    let l = incr (i-1) [] in
+    (* List.iter l ~f:(fun e -> printf "%d " e);printf "\n%!"; *)
+    l
+
+  let collect_word_tags sentences =
+    let a = Array.init (get_number_form ()) ~f:(fun _ -> []) in
+    let () = List.iter sentences
+      ~f:(fun sentence ->
+        List.iter sentence
+          ~f:(fun tok ->
+            let l = Array.unsafe_get a tok.form in
+            if (List.exists l ~f:((=) tok.pos))
+            then (* printf "%d %d\n%!" tok.pos (List.length l) *)
+              ()
+            else
+              Array.unsafe_set a tok.form (tok.pos::l)
+
+          )
+      )
+    in
+    Array.replace_all a ~f:(fun l -> List.sort l ~cmp:Int.compare);
+
+    (* Array.iteri a *)
+    (*   ~f:(fun i l -> *)
+    (*     if i < 200 *)
+    (*     then *)
+    (*       begin *)
+    (*         printf "word %s %d\n%!" (Int2StringMap.int2str form_map i) (List.length l); *)
+    (*         List.iter l ~f:(fun e -> printf "%s " (Int2StringMap.int2str pos_map e) *)
+    (*         ); *)
+    (*         Printf.printf "\n%!" *)
+    (*       end *)
+    (*   ); *)
+    a
+
+
+
+  let has_hyphen t = t.has_hyphen
+  let has_digit t =  t.has_digit
+  let has_uppercase t = t.has_uppercase
 
 
 end

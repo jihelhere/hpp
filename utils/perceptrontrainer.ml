@@ -31,7 +31,8 @@ sig
     val weights : t -> float array
     val average : t -> float array
 
-    val reinit_from_average : t -> unit
+    val init_iteration : t -> unit
+    val finish_iteration : t -> bool -> unit
   end
 
 module OnlineMarginTrainer
@@ -61,8 +62,9 @@ struct
       (update_stats, reset_stats, final_score)
 
     let train_and_eval feature_weights fun_update
-        (fun_eval, fun_reset_eval, final_score) corpus =
-      let my_decoder = D.decode feature_weights in
+        (fun_eval, fun_reset_eval, final_score) corpus
+        pruner =
+      let my_decoder = D.decode feature_weights pruner in
       let constrained_decoder = D.constrained_decode feature_weights in
 
       fun_reset_eval ();
@@ -78,15 +80,15 @@ struct
       final_score ()
 
 
-    let train_epoch ~update_func ~feature_weights ~corpus ~verbose =
-      train_and_eval feature_weights update_func (eval_task verbose ()) corpus
+    let train_epoch ~update_func ~feature_weights ~corpus ~verbose ~pruner =
+      train_and_eval feature_weights update_func (eval_task verbose ()) corpus pruner
 
     let dont_update_model = fun _ _ _ -> ()
 
-    let eval_epoch ~feature_weights ~corpus ~verbose =
-      train_and_eval feature_weights dont_update_model (eval_task verbose ()) corpus
+    let eval_epoch ~feature_weights ~corpus ~verbose ~pruner =
+      train_and_eval feature_weights dont_update_model (eval_task verbose ()) corpus pruner
 
-    let eval_print_epoch ~filename ~feature_weights ~corpus ~verbose =
+    let eval_print_epoch ~filename ~feature_weights ~corpus ~verbose ~pruner =
       let oc = Out_channel.create filename in
       let (update_stats, reset_stats, final_score) = eval_task verbose ()
       in
@@ -98,7 +100,7 @@ struct
         Printf.fprintf oc "\n%!"
       in
       (* REMEMBER TO ALWAYS TYPE UNUSED RESULTS -> *)
-      let (_unused_score : float) = train_and_eval feature_weights dont_update_model (update_stats_print, reset_stats, final_score) corpus
+      let (_unused_score : float) = train_and_eval feature_weights dont_update_model (update_stats_print, reset_stats, final_score) corpus pruner
       in
       Out_channel.close oc
 
@@ -118,6 +120,8 @@ struct
       let dev_instances   = filename_to_list_opt dev_filename  in
       let test_instances  = filename_to_list_opt test_filename in
 
+      let form_pos = (C.collect_word_tags train_instances,
+                      C.collect_unk_tags ()) in
 
       (* collect features on corpus and filter out rare ones *)
       D.Feature.collect_features_on_corpus ~only_gold:true train_instances;
@@ -135,31 +139,34 @@ struct
             Printf.printf("\nIteration: %d\nTraining\n%!") epoch
           in
 
-          let () =
-            if (restart_freq > 0) && (epoch mod restart_freq = 0)
-            then U.reinit_from_average updater
-          in
+          let () = U.init_iteration updater in
+
           let (_ : float) = train_epoch ~verbose
             ~update_func:(U.update updater max_iter epoch)
             ~feature_weights:(U.weights updater)
             ~corpus:train_instances
+            ~pruner: form_pos
           in
 
-          (* let average = U.average updater in *)
+          let reinit_from_average = (restart_freq > 0) && (epoch mod restart_freq = 0) in
+          let () = U.finish_iteration updater reinit_from_average in
+
+          let average = U.average updater in
 
           let dev_score =
             match dev_instances with
             | None -> 0.0
             | Some dis ->
                Printf.printf("\nDev:\n%!");
-              eval_epoch ~feature_weights:(* average *) (U.weights updater)
+              eval_epoch ~feature_weights: average
                 ~corpus:dis ~verbose
+                ~pruner: form_pos
           in
 
           let train_instances = List.permute train_instances in
           (* made any progress ? *)
           if dev_score >= best_score
-          then main_loop train_instances (* average *) (U.weights updater)
+          then main_loop train_instances average
             dev_score (epoch+1)
           else main_loop train_instances best best_score (epoch+1)
 
@@ -176,6 +183,7 @@ struct
              ~feature_weights:final
              ~corpus:tis
              ~verbose
+             ~pruner: form_pos
            ;
            Printf.printf("\n%!")
       in
@@ -189,14 +197,16 @@ module PerceptronTrainer(Co : ConllType) (E : Eval with module C = Co) (D : Deco
     module UpdatePerceptron : Updater with module C = D.C =
     struct
       type t = {size: int;
+                total: int;
                 mutable counter: int;
-                weights: float Array.t;
-                average_weights: float Array.t
+                model: float Array.t;
+                sum: float Array.t;
+                iter_tmp: float Array.t;
                }
 
       module C = Co
 
-      let create ~random_init ~total:_ ~size =
+      let create ~random_init ~total ~size =
         let w = Array.create ~len:size 0.0 in
         let () = if random_init
           then
@@ -204,15 +214,18 @@ module PerceptronTrainer(Co : ConllType) (E : Eval with module C = Co) (D : Deco
               for i = 0 to (size/2) - 1 do
                 let f = Random.float 1e-4 in
                 Array.unsafe_set w i f;
-                Array.unsafe_set w (size-i) (-.f)
+                Array.unsafe_set w (size-i-1) (-.f)
               done;
               Array.permute w
             end
           else ()
         in
-        { size = size; counter = 0;
-          weights = w;
-          average_weights = Array.create ~len:size 0.0
+        { size = size;
+          total = total;
+          counter = 0;
+          model = w;
+          sum = Array.create ~len:size 0.0;
+          iter_tmp = Array.create ~len:size 0.0;
         }
 
 
@@ -220,12 +233,7 @@ module PerceptronTrainer(Co : ConllType) (E : Eval with module C = Co) (D : Deco
       let incr_examples t = t.counter <- t.counter +1
 
         (* compute perceptron update*)
-      let update  t _ _ _ ref_sentence hyp_sentence =
-
-        (* let opt_oper oper = function *)
-        (*   | None -> Some (oper 0 1) (\* init: +/- 1 *\) *)
-        (*   | Some x -> Some (oper x 1) (\* update: x +/- 1 *\) *)
-        (* in *)
+      let update  t _max_iteration _iteration idx_sentence ref_sentence hyp_sentence =
 
 
         let htbl = Hashtbl.create ~hashable:Int.hashable () in
@@ -234,23 +242,35 @@ module PerceptronTrainer(Co : ConllType) (E : Eval with module C = Co) (D : Deco
 
         (* update model *)
         incr_examples t;
+
         Hashtbl.iter htbl
           ~f:(fun ~key:fi ~data:count ->
             if count <> 0
             then
-              (t.weights.(fi)         <- t.weights.(fi)         +. (Float.of_int count);
-               t.average_weights.(fi) <- t.average_weights.(fi) +. (Float.of_int (t.counter * count)))
+              (t.model.(fi)    <- t.model.(fi)    +. (Float.of_int count);
+               t.iter_tmp.(fi) <- t.iter_tmp.(fi) +. (Float.of_int ((t.total - idx_sentence) * count))
+              )
           )
 
       let average t =
-        Array.init t.size ~f:(fun i -> t.weights.(i) -. (t.average_weights.(i) /. (Float.of_int t.counter)))
+        Array.init t.size ~f:(fun i -> t.sum.(i) /. (Float.of_int t.counter))
 
-      let weights t = t.weights
+      let weights t = t.model
 
-      let reinit_from_average t =
-        let a = average t in
-        Array.iteri a
-          ~f:(fun i f -> Array.unsafe_set t.weights i f)
+      let init_iteration t =
+        Array.iteri t.model
+          ~f:(fun i w -> Array.unsafe_set t.iter_tmp i ((Float.of_int t.total) *. w))
+
+      let finish_iteration t reinit_from_average =
+        Array.iteri t.iter_tmp
+          ~f:(fun i w -> Array.replace t.sum i ~f:(fun v -> v +. w));
+        if reinit_from_average
+        then
+          Array.iteri t.sum
+            ~f:(fun i w -> Array.unsafe_set t.model i (w /. (Float.of_int t.counter)))
+        else
+          ()
+
 
 
       end
@@ -281,6 +301,10 @@ module MiraTrainer (Co : ConllType) (E : Eval with module C = Co) (D : Decoder w
                                     clip = Float.infinity;}
 
         let incr_examples t = t.counter <- t.counter +1
+
+        let init_iteration _t = failwith "not implemented"
+        let finish_iteration _t = failwith "not implemented"
+
 
         (* compute mira update*)
         let update  t max_iter epoch num (ref_sentence,rfl,rel) (hyp_sentence,hfl,hel) =
@@ -349,10 +373,7 @@ module MiraTrainer (Co : ConllType) (E : Eval with module C = Co) (D : Decoder w
         let average t = Array.copy t.average_weights
         let weights t = t.weights
 
-      let reinit_from_average t =
-        let a = average t in
-        Array.iteri a
-          ~f:(fun i f -> Array.unsafe_set t.weights i f)
+
 
       end
     include OnlineMarginTrainer(Co)(E)(UpdateOneBestMira)(D)

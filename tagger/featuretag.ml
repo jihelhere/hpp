@@ -161,7 +161,7 @@ module Feature_Tag = struct
                 |> T.collect_templates ~only_gold
               )
 
-  let compute_score_difference params refs hyps i refp hypp  = failwith "not implemented"
+  let compute_score_difference _params _refs _hyps _i _refp _hypp  = failwith "not implemented"
     (* (get_uni_score params refs i (C.prediction refp)) *)
     (* +. *)
     (*   (if i > 0 *)

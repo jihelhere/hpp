@@ -69,4 +69,15 @@ module Conll_Tag :
     val save_all_string_tables_to_file : string -> unit
 
     val load_map_from_sexp : Sexp.t -> unit
+
+    val collect_word_tags : sentence list -> int list array
+    val collect_unk_tags :  unit  -> int list
+
+    val has_hyphen : t -> bool
+    val has_digit : t -> bool
+    val has_uppercase : t -> bool
+
+    val get_prefix_list : t -> int list
+    val get_suffix_list : t -> int list
+
   end

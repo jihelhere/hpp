@@ -113,6 +113,9 @@ module Template_Tag =
       | U_NWord (* next word *)
       | U_NSuf (* next suffix *)
       | U_NNWord (* next next word *)
+      | U_Digit
+      | U_Hyphen
+      | U_Upper
 
 
     type bi_template_type =
@@ -272,29 +275,37 @@ module Template_Tag =
 
 
     let make_template_uni fun_score array_sentence i =
-      let init = delta (i = 0) in
+      (* let init = delta (i = 0) in *)
       let tok = Array.unsafe_get array_sentence i in
-      let tok = if C.is_digit tok then C.digit else tok in
+      (* let tok = if C.is_digit tok then C.digit else tok in *)
       let word = C.get_form_id tok in
-      let pref = C.get_prefix_id tok in
-      let suf = C.get_suffix_id tok in
+      (* let pref = C.get_prefix_id tok in *)
+      (* let suf = C.get_suffix_id tok in *)
 
+      let pref_list = C.get_prefix_list tok in
+      let suf_list =  C.get_suffix_list tok in
+
+
+
+      let digit = C.has_digit tok in
+      let hyphen= C.has_hyphen tok in
+      let upper = i > 0 && C.has_uppercase tok in
 
       let ptok = if i = 0 then C.start else Array.unsafe_get array_sentence (i-1) in
-      let ptok = if C.is_digit ptok then C.digit else ptok in
+      (* let ptok = if C.is_digit ptok then C.digit else ptok in *)
       let pword = C.get_form_id ptok in
       (* let ppref = C.get_prefix_id ptok in *)
-      let psuf = C.get_suffix_id ptok in
+      (* let psuf = C.get_suffix_id ptok in *)
 
       let pptok = if i < 2 then C.start else Array.unsafe_get array_sentence (i-2) in
-      let pptok = if C.is_digit pptok then C.digit else pptok in
+      (* let pptok = if C.is_digit pptok then C.digit else pptok in *)
       let ppword = C.get_form_id pptok in
 
       let ntok = if i >= (Array.length array_sentence) - 1 then C.stop else Array.unsafe_get array_sentence (i+1) in
-      let ntok = if C.is_digit ntok then C.digit else ntok in
+      (* let ntok = if C.is_digit ntok then C.digit else ntok in *)
       let nword = C.get_form_id ntok in
       (* let ppref = C.get_prefix_id ntok in *)
-      let nsuf = C.get_suffix_id ntok in
+      (* let nsuf = C.get_suffix_id ntok in *)
 
       let nntok = if i >= (Array.length array_sentence) - 2 then C.stop else Array.unsafe_get array_sentence (i+2) in
       let nntok = if C.is_digit nntok then C.digit else nntok in
@@ -303,40 +314,47 @@ module Template_Tag =
       fun pos lat ->
         let pos = combine_pos_lat pos lat in
         0.0
-      +. (fun_score (ftt U_Bias pos init))
-      +. (fun_score (fwtt U_Word word pos init))
-      +. (fun_score (fwtt U_Pref pref pos init))
-      +. (fun_score (fwtt U_Suf suf  pos init))
-      +. (fun_score (fwtt U_PWord pword pos init))
-      +. (fun_score (fwtt U_PSuf  psuf  pos init))
-      +. (fun_score (fwtt U_PPWord ppword pos init))
-      +. (fun_score (fwtt U_NWord nword pos init))
-      +. (fun_score (fwtt U_NSuf  nsuf  pos init))
-      +. (fun_score (fwtt U_NNWord nnword pos init))
+      +. (fun_score (ft U_Bias pos))
+      +. (fun_score (fwt U_Word word pos))
+      (* +. (fun_score (fwt U_Pref pref pos)) *)
+      (* +. (fun_score (fwt U_Suf suf  pos )) *)
+      +. (fun_score (fwt U_PWord pword pos))
+      (* +. (fun_score (fwt U_PSuf  psuf  pos)) *)
+      +. (fun_score (fwt U_PPWord ppword pos))
+      +. (fun_score (fwt U_NWord nword pos))
+      (* +. (fun_score (fwt U_NSuf  nsuf  pos)) *)
+        +. (fun_score (fwt U_NNWord nnword pos))
+        +. (fun_score (ftt U_Digit (delta digit) pos))
+        +. (fun_score (ftt U_Hyphen (delta hyphen) pos))
+        +. (fun_score (ftt U_Upper (delta upper) pos))
 
-    let make_template_bi fun_score array_sentence i ppos latvar_ppos pos latvar_pos =
+          +. List.foldi pref_list ~init:0.0 ~f:(fun i acc p -> acc +. (fun_score (fwtt U_Pref p i pos)))
+          +. List.foldi suf_list ~init:0.0 ~f:(fun i acc p -> acc +. (fun_score (fwtt U_Suf p i pos)))
+
+
+    let make_template_bi fun_score _array_sentence _i ppos latvar_ppos pos latvar_pos =
 
       let ppos = combine_pos_lat ppos latvar_ppos in
       let pos  = combine_pos_lat pos latvar_pos in
 
-      let init = delta (i = 0) in
-      let tok = if i >= Array.length array_sentence then C.stop else Array.unsafe_get array_sentence i in
+      (* let init = delta (i = 0) in *)
+      (* let tok = if i >= Array.length array_sentence then C.stop else Array.unsafe_get array_sentence i in *)
       (* let tok = if C.is_digit tok then C.digit else tok in *)
-      let word = C.get_form_id tok in
+      (* let word = C.get_form_id tok in *)
       (* let pref = C.get_prefix_id tok in *)
       (* let suf = C.get_suffix_id tok in *)
       0.0
-    (*   +. (fun_score (ftt B_Bias ppos pos)) *)
+      +. (fun_score (ftt B_Bias ppos pos))
     (*   +. (fun_score (ft B_PPos ppos)) *)
     (*   +. (fun_score (fwt B_PPos_Word word ppos)) *)
     (*   +. (fun_score (fwtt B_Word word ppos pos)) *)
     (*   (\* +. (fun_score (fwtt B_Pref pref ppos pos)) *\) *)
     (* (\* +. (fun_score (fwtt B_Suf suf  ppos pos)) *\) *)
 
-      +. (fun_score (fttt B_Bias ppos pos init))
-      +. (fun_score (ftt B_PPos ppos init))
-      +. (fun_score (fwtt B_PPos_Word word ppos init))
-      +. (fun_score (fwttt B_Word word ppos pos init))
+      (* +. (fun_score (fttt B_Bias ppos pos init)) *)
+      (* +. (fun_score (ftt B_PPos ppos init)) *)
+      (* +. (fun_score (fwtt B_PPos_Word word ppos init)) *)
+      (* +. (fun_score (fwttt B_Word word ppos pos init)) *)
       (* +. (fun_score (fwttt B_Pref pref ppos pos init)) *)
       (* +. (fun_score (fwttt B_Suf suf  ppos pos init)) *)
 
