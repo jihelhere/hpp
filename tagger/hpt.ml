@@ -82,11 +82,11 @@ let predict =
     (fun model_fname input_fname output_fname  verbose () ->
 
      let feature_weights = Model.load model_fname |> Model.get_data in
-     let corpus = Conll_Tag.do_read_file input_fname in
+     let corpus = Conll_Tag.do_read_file input_fname ~collect_word:false in
 
      Sequence_Decoder.decode_corpus
        ~filename:output_fname ~feature_weights ~corpus
-       ~verbose ~pruner:([||],[])
+       ~verbose
     )
 
 let command =

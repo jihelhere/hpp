@@ -33,7 +33,10 @@ struct
   module Feature = F
 
 
-  let decode params (pruner,poslist) sent =
+  let decode params sent =
+
+    let pruner  = C.collect_word_tags () in
+    let poslist = C.collect_unk_tags () in
 
     (* let () = printf "entering decode\n%!" in *)
     let nb_labels = C.get_number_pos () in
@@ -316,7 +319,7 @@ struct
 
 
 
-  let decode_corpus ~filename ~feature_weights ~corpus ~verbose ~pruner =
+  let decode_corpus ~filename ~feature_weights ~corpus ~verbose =
     let decode_func = decode  feature_weights in
     let oc = Out_channel.create filename in
     let t1 = Time.now () in
@@ -324,7 +327,7 @@ struct
       List.iter (C.corpus_to_list corpus)
         ~f:(fun s ->
           let ref_a = C.prepare_sentence_for_decoder s in
-          let (hyp_a,lat_start,lat_stop) = decode_func pruner ref_a in
+          let (hyp_a,lat_start,lat_stop) = decode_func ref_a in
           Array.iter hyp_a ~f:(fun tok -> Printf.fprintf oc "%s\n" (C.to_string tok));
           fprintf oc "\n"
         ) in

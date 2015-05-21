@@ -21,17 +21,16 @@ sig
     type sentence
     type corpus
 
-    (*well, int...*)
     val prediction : t -> int
 
     val same_prediction : t -> t -> bool
     val prepare_sentence_for_decoder : sentence -> t array
     val to_string : t -> string
 
-    val do_read_file : string -> corpus
+    val do_read_file : string -> collect_word:bool -> corpus
     val corpus_to_list : corpus -> sentence list
 
-    val collect_word_tags : sentence list -> int list array
+    val collect_word_tags : unit  -> int list array
     val collect_unk_tags :  unit  -> int list
 
 end

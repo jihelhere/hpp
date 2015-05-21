@@ -25,16 +25,17 @@ struct
 
   type t =
     {
-      form       : int;
-      pos        : int;
-      latpos     : int;
-      prefix     : int;
-      suffix     : int;
-      has_digit  : bool;
+      orig_form     : string;
+      form          : int;
+      pos           : int;
+      latpos        : int;
+      prefix        : int;
+      suffix        : int;
+      has_digit     : bool;
       has_uppercase : bool;
-      has_hyphen  : bool;
-      prefix_list : int list;
-      suffix_list : int list;
+      has_hyphen    : bool;
+      prefix_list   : int list;
+      suffix_list   : int list;
     }
 
   let same_prediction t1 t2 = (t1.pos = t2.pos)
@@ -50,8 +51,8 @@ struct
   let pos_map = Int2StringMap.empty ()
 
   (* TODO: command line argument to set this *)
-  let prefix_length = 4
-  let suffix_length = 4
+  let prefix_length = 10
+  let suffix_length = 10
 
   let prefix_map = Int2StringMap.empty ()
   let suffix_map = Int2StringMap.empty ()
@@ -64,7 +65,7 @@ struct
 
 
   let p_has_hyphen t = String.contains t '-'
-  let p_has_digit t =  List.exists ['0';'1';'2';'3';'4';'5';'6';'7';'8';'9'] ~f:(fun e -> String.contains t e)
+  let p_has_digit t =  String.exists t ~f:(fun c -> c >= '0' && c <= '9')
   let p_has_uppercase t = not (String.lowercase t = t)
 
   let p_extract_pref str =
@@ -83,7 +84,60 @@ struct
     aux str 1 []
 
 
+
+  let start =
+    let str = "__START__" in
+    {
+      orig_form = str;
+      form = Int2StringMap.str2int form_map str;
+      pos = Int2StringMap.str2int pos_map str;
+      latpos = -1;
+      prefix = Int2StringMap.str2int prefix_map (get_string_prefix str);
+      suffix = Int2StringMap.str2int suffix_map (get_string_suffix str);
+      has_digit = false;
+      has_uppercase = false;
+      has_hyphen = false;
+      prefix_list = List.map (p_extract_pref str) ~f:(fun s -> Int2StringMap.str2int prefix_map s);
+      suffix_list = List.map (p_extract_suf str)  ~f:(fun s -> Int2StringMap.str2int suffix_map s);
+              }
+
+  let stop =
+    let str = "__STOP__" in
+    {
+      orig_form = str;
+      form = Int2StringMap.str2int form_map str;
+      pos = Int2StringMap.str2int pos_map str;
+      latpos = -1;
+      prefix = Int2StringMap.str2int prefix_map (get_string_prefix str);
+      suffix = Int2StringMap.str2int suffix_map (get_string_suffix str);
+      has_digit = false;
+      has_uppercase = false;
+      has_hyphen = false;
+      prefix_list = List.map (p_extract_pref str) ~f:(fun s -> Int2StringMap.str2int prefix_map s);
+      suffix_list = List.map (p_extract_suf str)  ~f:(fun s -> Int2StringMap.str2int suffix_map s);
+    }
+
+  let unknown =
+    let str = "__UNK__" in
+    {
+      orig_form = str;
+      form = Int2StringMap.str2int form_map str;
+      pos = Int2StringMap.str2int pos_map str;
+      latpos = -1;
+      prefix = Int2StringMap.str2int prefix_map (get_string_prefix str);
+      suffix = Int2StringMap.str2int suffix_map (get_string_suffix str);
+      has_digit = false;
+      has_uppercase = false;
+      has_hyphen = false;
+      prefix_list = List.map (p_extract_pref str) ~f:(fun s -> Int2StringMap.str2int prefix_map s);
+      suffix_list = List.map (p_extract_suf str)  ~f:(fun s -> Int2StringMap.str2int suffix_map s);
+    }
+
+
   let separator_regex = Regex.create_exn "\t"
+  let word_freq = Hashtbl.create ~hashable:String.hashable ()
+  let pruner = ref (Array.empty ())
+  let pos_list = ref []
 
   let line_to_conll_token line =
     let lt = Regex.split separator_regex line in
@@ -93,8 +147,12 @@ struct
       | (Some v) -> v
     in
     let form = get_field 1 in
+    let form_id = match Hashtbl.find word_freq form with
+      | Some x when x > 1 -> Int2StringMap.str2int form_map  (String.lowercase form)
+      | _ -> unknown.form in
     {
-      form       = Int2StringMap.str2int form_map  (String.lowercase form);
+      orig_form = form;
+      form       =  form_id;
       pos        = Int2StringMap.str2int pos_map (get_field 2);
       latpos     = -1;
       prefix = Int2StringMap.str2int prefix_map (get_string_prefix form);
@@ -107,44 +165,7 @@ struct
     }
 
 
-  let start = {
-              form = Int2StringMap.str2int form_map "__START__";
-              pos = Int2StringMap.str2int pos_map "__START__";
-              latpos = -1;
-              prefix = Int2StringMap.str2int prefix_map (get_string_prefix "__START__");
-              suffix = Int2StringMap.str2int suffix_map (get_string_suffix "__START__");
-              has_digit = false;
-              has_uppercase = false;
-              has_hyphen = false;
-              prefix_list = List.map (p_extract_pref "__START__") ~f:(fun s -> Int2StringMap.str2int prefix_map s);
-              suffix_list = List.map (p_extract_suf "__START__")  ~f:(fun s -> Int2StringMap.str2int suffix_map s);
-              }
 
-  let stop = {
-               form = Int2StringMap.str2int form_map "__STOP__";
-               pos = Int2StringMap.str2int pos_map "__STOP__";
-               latpos = -1;
-               prefix = Int2StringMap.str2int prefix_map (get_string_prefix "__STOP__");
-               suffix = Int2StringMap.str2int suffix_map (get_string_suffix "__STOP__");
-               has_digit = false;
-              has_uppercase = false;
-              has_hyphen = false;
-              prefix_list = List.map (p_extract_pref "__STOP__") ~f:(fun s -> Int2StringMap.str2int prefix_map s);
-              suffix_list = List.map (p_extract_suf "__STOP__")  ~f:(fun s -> Int2StringMap.str2int suffix_map s);
-              }
-
-  let digit = {
-               form = Int2StringMap.str2int form_map "__DIGIT__";
-               pos = Int2StringMap.str2int pos_map "__DIGIT__";
-               latpos = -1;
-               prefix = Int2StringMap.str2int prefix_map (get_string_prefix "__DIGIT__");
-               suffix = Int2StringMap.str2int suffix_map (get_string_suffix "__DIGIT__");
-               has_digit = false;
-               has_uppercase = false;
-               has_hyphen = false;
-               prefix_list = List.map (p_extract_pref "__DIGIT__") ~f:(fun s -> Int2StringMap.str2int prefix_map s);
-               suffix_list = List.map (p_extract_suf "__DIGIT__")  ~f:(fun s -> Int2StringMap.str2int suffix_map s);
-              }
 
 
   let get_idx _t = 0
@@ -170,10 +191,8 @@ struct
   let get_number_form () = Int2StringMap.get_size form_map
   let get_number_pos () = Int2StringMap.get_size pos_map
 
-  let to_string t =
-    Printf.sprintf "%s\t%s"
-      (get_form t)
-      (get_pos t)
+  let to_string t = Printf.sprintf "%s\t%s" t.orig_form (get_pos t)
+
 
   let is_digit t =
     let first = (get_form t).[0] in
@@ -196,13 +215,30 @@ struct
 
 
   let load_map_from_sexp sexp =
+    let read_hash map s =
+      let rec add_pairs l =
+        match l with
+        | [] -> ()
+        | Sexp.List([Sexp.Atom h1;Sexp.Atom h2])::q ->
+             let _ = Hashtbl.add map ~key:h1 ~data:(Int.of_string h2) in
+             add_pairs q
+        | _ -> failwith "add_pairs"
+      in
+      match s with
+    | Sexp.List(q) -> add_pairs q
+    | _ -> failwith "t_of_sexp"
+    in
+
     match sexp with
     | Sexp.List ([Sexp.Atom name; map]) ->
        (match name with
-        | "form_map"         -> Int2StringMap.load_from_sexp form_map map
-        | "pos_map"          -> Int2StringMap.load_from_sexp pos_map map
-        | "prefix_map"       -> Int2StringMap.load_from_sexp prefix_map map
-        | "suffix_map"       -> Int2StringMap.load_from_sexp suffix_map map
+        | "form_map"     -> Int2StringMap.load_from_sexp form_map map
+        | "pos_map"      -> Int2StringMap.load_from_sexp pos_map map
+        | "prefix_map"   -> Int2StringMap.load_from_sexp prefix_map map
+        | "suffix_map"   -> Int2StringMap.load_from_sexp suffix_map map
+        | "word_freq"    -> read_hash word_freq map
+        | "pruner"       -> pruner := Array.t_of_sexp (List.t_of_sexp Int.t_of_sexp) map
+        | "pos_list"     -> pos_list :=  List.t_of_sexp Int.t_of_sexp map
         | _ -> assert(false)
        )
     | _ -> assert(false)
@@ -223,62 +259,50 @@ struct
   let all_string_tables_to_sexp () =
     let a x = Sexp.Atom x and l x = Sexp.List x in
     l [ a "corpus";
-        l [ a "form_map" ; Int2StringMap.sexp_of_t form_map];
-        l [ a "pos_map" ; Int2StringMap.sexp_of_t pos_map];
+        l [ a "form_map"   ; Int2StringMap.sexp_of_t form_map];
+        l [ a "pos_map"    ; Int2StringMap.sexp_of_t pos_map];
         l [ a "prefix_map" ; Int2StringMap.sexp_of_t prefix_map];
-        l [ a "suffix_map" ; Int2StringMap.sexp_of_t suffix_map]
+        l [ a "suffix_map" ; Int2StringMap.sexp_of_t suffix_map];
+        l [ a "word_freq"  ; Hashtbl.sexp_of_t String.sexp_of_t Int.sexp_of_t word_freq];
+        l [ a "pruner"     ; Array.sexp_of_t (fun l -> List.sexp_of_t Int.sexp_of_t l) !pruner];
+        l [ a "pos_list"   ; List.sexp_of_t Int.sexp_of_t !pos_list]
       ]
 
   let save_all_string_tables_to_file filename =
     all_string_tables_to_sexp ()
     |> Sexp.save_hum filename
 
+  (* let do_read_file_unordered file = *)
+  (*   (\* let i = ref 0 in *\) *)
+  (*   fst (In_channel.with_file file ~f: *)
+  (*                             (fun ic -> *)
+  (*                              In_channel.fold_lines ic ~init:([],[]) *)
+  (*                                                    ~f:(fun (acc_corpus,acc_sent) line -> *)
+  (*                                                        if line = "" *)
+  (*                                                        then *)
+  (*                                                          (\* let _ = i := !i + 1 in *\) *)
+  (*                                                          (\* let _ = Printf.printf "Loading %d sentences\r%!" !i in *\) *)
+  (*                                                          (acc_sent::acc_corpus, []) *)
+  (*                                                        else (acc_corpus, (line_to_conll_token line)::acc_sent)) *)
+  (*                             ) *)
+  (*       ) *)
 
-  let do_read_file_unordered file =
-    (* let i = ref 0 in *)
-    fst (In_channel.with_file file ~f:
-                              (fun ic ->
-                               In_channel.fold_lines ic ~init:([],[])
-                                                     ~f:(fun (acc_corpus,acc_sent) line ->
-                                                         if line = ""
-                                                         then
-                                                           (* let _ = i := !i + 1 in *)
-                                                           (* let _ = Printf.printf "Loading %d sentences\r%!" !i in *)
-                                                           (acc_sent::acc_corpus, [])
-                                                         else (acc_corpus, (line_to_conll_token line)::acc_sent))
-                              )
-        )
 
-  (* let do_read_ordered file = *)
-  let do_read_file file  =
-    let i = ref 0 in
-    List.rev
-      (fst (In_channel.with_file file ~f:
-                                 (fun ic ->
-                                  In_channel.fold_lines ic ~init:([],[])
-                                                        ~f:(fun (acc_corpus,acc_sent) line ->
-                                                            if line = ""
-                                                            then
-                                                              let _ = i := !i + 1 in
-                                                              let _ = Printf.printf "Loading %d sentences\r%!" !i in
-                                                              ((List.rev acc_sent)::acc_corpus, [])
-                                                            else (acc_corpus, (line_to_conll_token line)::acc_sent))
-                                 )
-           )
+  let collect_word_freq filename =
+    In_channel.with_file filename
+      ~f:(fun ic ->
+        In_channel.iter_lines ic
+          ~f:(fun line ->
+            if line = ""  then ()
+            else
+               match Regex.split separator_regex line with
+               | [_;form;_] -> Hashtbl.change word_freq  form (function | None -> Some 1 | Some x -> Some(x+1))
+               | _ -> failwith "??"
+
+          )
       )
 
-
-  let collect_unk_tags () =
-    let i = get_number_pos () in
-    let rec incr i acc =
-      if i < 0 then acc
-      else incr (i-1) (i::acc)
-    in
-    let l = incr (i-1) [] in
-    (* List.iter l ~f:(fun e -> printf "%d " e);printf "\n%!"; *)
-    l
-
-  let collect_word_tags sentences =
+        let p_collect_word_tags sentences =
     let a = Array.init (get_number_form ()) ~f:(fun _ -> []) in
     let () = List.iter sentences
       ~f:(fun sentence ->
@@ -286,7 +310,7 @@ struct
           ~f:(fun tok ->
             let l = Array.unsafe_get a tok.form in
             if (List.exists l ~f:((=) tok.pos))
-            then (* printf "%d %d\n%!" tok.pos (List.length l) *)
+            then
               ()
             else
               Array.unsafe_set a tok.form (tok.pos::l)
@@ -295,19 +319,56 @@ struct
       )
     in
     Array.replace_all a ~f:(fun l -> List.sort l ~cmp:Int.compare);
+    pruner := a
 
-    (* Array.iteri a *)
-    (*   ~f:(fun i l -> *)
-    (*     if i < 200 *)
-    (*     then *)
-    (*       begin *)
-    (*         printf "word %s %d\n%!" (Int2StringMap.int2str form_map i) (List.length l); *)
-    (*         List.iter l ~f:(fun e -> printf "%s " (Int2StringMap.int2str pos_map e) *)
-    (*         ); *)
-    (*         Printf.printf "\n%!" *)
-    (*       end *)
-    (*   ); *)
-    a
+  let collect_word_tags () = !pruner
+
+
+  let p_collect_unk_tags () =
+    let i = get_number_pos () in
+    let rec incr i acc =
+      if i < 0 then acc
+      else incr (i-1) (i::acc)
+    in
+    let l = incr (i-1) [] in
+    (* List.iter l ~f:(fun e -> printf "%d " e);printf "\n%!"; *)
+    pos_list := l
+
+
+  let collect_unk_tags () = !pos_list
+
+
+  (* let do_read_ordered file = *)
+  let do_read_file file  ~collect_word =
+    let () = if collect_word
+      then collect_word_freq file
+    in
+    let i = ref 0 in
+    let sentences =
+      List.rev
+      (fst (In_channel.with_file file ~f:
+              (fun ic ->
+                In_channel.fold_lines ic ~init:([],[])
+                  ~f:(fun (acc_corpus,acc_sent) line ->
+                    if line = ""
+                    then
+                      let _ = i := !i + 1 in
+                      let _ = Printf.printf "Loading %d sentences\r%!" !i in
+                      ((List.rev acc_sent)::acc_corpus, [])
+                    else (acc_corpus, (line_to_conll_token line)::acc_sent))
+              )
+       )
+      )
+    in
+    if collect_word
+    then
+      begin
+        p_collect_word_tags sentences;
+        p_collect_unk_tags ()
+      end;
+  sentences
+
+
 
 
 

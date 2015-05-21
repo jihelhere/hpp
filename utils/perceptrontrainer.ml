@@ -62,9 +62,8 @@ struct
       (update_stats, reset_stats, final_score)
 
     let train_and_eval feature_weights fun_update
-        (fun_eval, fun_reset_eval, final_score) corpus
-        pruner =
-      let my_decoder = D.decode feature_weights pruner in
+        (fun_eval, fun_reset_eval, final_score) corpus =
+      let my_decoder = D.decode feature_weights in
       let constrained_decoder = D.constrained_decode feature_weights in
 
       fun_reset_eval ();
@@ -80,15 +79,15 @@ struct
       final_score ()
 
 
-    let train_epoch ~update_func ~feature_weights ~corpus ~verbose ~pruner =
-      train_and_eval feature_weights update_func (eval_task verbose ()) corpus pruner
+    let train_epoch ~update_func ~feature_weights ~corpus ~verbose =
+      train_and_eval feature_weights update_func (eval_task verbose ()) corpus
 
     let dont_update_model = fun _ _ _ -> ()
 
-    let eval_epoch ~feature_weights ~corpus ~verbose ~pruner =
-      train_and_eval feature_weights dont_update_model (eval_task verbose ()) corpus pruner
+    let eval_epoch ~feature_weights ~corpus ~verbose =
+      train_and_eval feature_weights dont_update_model (eval_task verbose ()) corpus
 
-    let eval_print_epoch ~filename ~feature_weights ~corpus ~verbose ~pruner =
+    let eval_print_epoch ~filename ~feature_weights ~corpus ~verbose =
       let oc = Out_channel.create filename in
       let (update_stats, reset_stats, final_score) = eval_task verbose ()
       in
@@ -100,7 +99,7 @@ struct
         Printf.fprintf oc "\n%!"
       in
       (* REMEMBER TO ALWAYS TYPE UNUSED RESULTS -> *)
-      let (_unused_score : float) = train_and_eval feature_weights dont_update_model (update_stats_print, reset_stats, final_score) corpus pruner
+      let (_unused_score : float) = train_and_eval feature_weights dont_update_model (update_stats_print, reset_stats, final_score) corpus
       in
       Out_channel.close oc
 
@@ -112,16 +111,13 @@ struct
 
 
 
-      let filename_to_list x = x |> C.do_read_file |> C.corpus_to_list in
+      let filename_to_list x b = x |> C.do_read_file ~collect_word:b |> C.corpus_to_list in
       let open Option.Monad_infix in
-      let filename_to_list_opt x = x >>= (fun df -> Some (filename_to_list df)) in
+      let filename_to_list_opt x b = x >>= (fun df -> Some (filename_to_list df b)) in
 
-      let train_instances = filename_to_list train_filename    in
-      let dev_instances   = filename_to_list_opt dev_filename  in
-      let test_instances  = filename_to_list_opt test_filename in
-
-      let form_pos = (C.collect_word_tags train_instances,
-                      C.collect_unk_tags ()) in
+      let train_instances = filename_to_list     train_filename    true   in
+      let dev_instances   = filename_to_list_opt dev_filename      false in
+      let test_instances  = filename_to_list_opt test_filename     false in
 
       (* collect features on corpus and filter out rare ones *)
       D.Feature.collect_features_on_corpus ~only_gold:true train_instances;
@@ -145,12 +141,11 @@ struct
             ~update_func:(U.update updater max_iter epoch)
             ~feature_weights:(U.weights updater)
             ~corpus:train_instances
-            ~pruner: form_pos
           in
+
 
           let reinit_from_average = (restart_freq > 0) && (epoch mod restart_freq = 0) in
           let () = U.finish_iteration updater reinit_from_average in
-
           let average = U.average updater in
 
           let dev_score =
@@ -160,8 +155,8 @@ struct
                Printf.printf("\nDev:\n%!");
               eval_epoch ~feature_weights: average
                 ~corpus:dis ~verbose
-                ~pruner: form_pos
           in
+
 
           let train_instances = List.permute train_instances in
           (* made any progress ? *)
@@ -183,7 +178,6 @@ struct
              ~feature_weights:final
              ~corpus:tis
              ~verbose
-             ~pruner: form_pos
            ;
            Printf.printf("\n%!")
       in
@@ -212,7 +206,7 @@ module PerceptronTrainer(Co : ConllType) (E : Eval with module C = Co) (D : Deco
           then
             begin
               for i = 0 to (size/2) - 1 do
-                let f = Random.float 1e-4 in
+                let f = Random.float 1.0 in
                 Array.unsafe_set w i f;
                 Array.unsafe_set w (size-i-1) (-.f)
               done;
@@ -229,10 +223,9 @@ module PerceptronTrainer(Co : ConllType) (E : Eval with module C = Co) (D : Deco
         }
 
 
-
       let incr_examples t = t.counter <- t.counter +1
 
-        (* compute perceptron update*)
+      (* compute perceptron update*)
       let update  t _max_iteration _iteration idx_sentence ref_sentence hyp_sentence =
 
 
@@ -307,7 +300,7 @@ module MiraTrainer (Co : ConllType) (E : Eval with module C = Co) (D : Decoder w
 
 
         (* compute mira update*)
-        let update  t max_iter epoch num (ref_sentence,rfl,rel) (hyp_sentence,hfl,hel) =
+        let update  t max_iter epoch num (ref_sentence,brfl,rel) (hyp_sentence,hfl,hel) =
           let htbl = Hashtbl.create ~hashable:Int.hashable () in
 
           let opt_oper oper = function
