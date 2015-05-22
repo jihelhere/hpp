@@ -146,20 +146,17 @@ module Feature_Tag = struct
     | _ -> assert(false)
 
 
-  let collect_features_on_corpus ~only_gold corpus =
+  let collect_features_on_corpus ~only_gold corpus ~verbose =
     let instances = ref 0 in
-    let () = Printf.printf "\nCollecting features:\n" in
+    let () = Printf.printf "\nCollecting features:\n%!" in
 
     List.iter corpus
-              ~f:
-              (
-                fun s ->
-                instances := !instances + 1;
-                Printf.printf "Sentence %d\r%!" !instances;
-
-                C.prepare_sentence_for_decoder s
-                |> T.collect_templates ~only_gold
-              )
+      ~f:(fun s ->
+        instances := !instances + 1;
+        if verbose then printf "Sentence %d\r%!" !instances;
+        C.prepare_sentence_for_decoder s |> T.collect_templates ~only_gold
+      );
+    printf "\nDone:\n"
 
   let compute_score_difference _params _refs _hyps _i _refp _hypp  = failwith "not implemented"
     (* (get_uni_score params refs i (C.prediction refp)) *)

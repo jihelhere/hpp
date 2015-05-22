@@ -61,7 +61,7 @@ module Conll_Tag :
     val to_string : t -> string
 
     val line_to_conll_token : string -> t
-    val do_read_file : string -> collect_word:bool -> corpus
+    val do_read_file : string -> collect_word:bool -> verbose:bool -> corpus
     val do_write_file : corpus -> string -> unit
 
     val all_string_tables_to_sexp : unit -> Sexp.t

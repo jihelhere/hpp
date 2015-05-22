@@ -84,7 +84,7 @@ let predict =
     (fun model_fname input_fname output_fname  verbose () ->
 
      let feature_weights,nb_hidden_vars = Model.load model_fname |> Model.get_data in
-     let corpus = Conll_Tag.do_read_file input_fname ~collect_word:false in
+     let corpus = Conll_Tag.do_read_file input_fname ~collect_word:false ~verbose in
 
      let () = Template_Tag.nb_hidden_vars := nb_hidden_vars in
 

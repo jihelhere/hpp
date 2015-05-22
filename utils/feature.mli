@@ -44,5 +44,5 @@ sig
 
   val load_template_map_from_sexp : Sexp.t -> unit
 
-  val collect_features_on_corpus : only_gold:bool -> C.sentence list -> unit
+  val collect_features_on_corpus : only_gold:bool -> C.sentence list -> verbose:bool -> unit
 end

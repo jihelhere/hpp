@@ -50,7 +50,7 @@ struct
 
     let print_count = ref 0 in
     let print_cond () = if verbose then true
-      else (print_count := !print_count + 1; (!print_count mod 100) = 0)
+      else (print_count := !print_count + 1; false) (* (!print_count mod 100) = 0) *)
     in
       let eval = E.empty in
       let update_stats ref_sent hyp_sent =
@@ -111,18 +111,19 @@ struct
 
 
 
-      let filename_to_list x b = x |> C.do_read_file ~collect_word:b |> C.corpus_to_list in
+      let filename_to_list x b = x |> C.do_read_file ~collect_word:b ~verbose |> C.corpus_to_list in
       let open Option.Monad_infix in
       let filename_to_list_opt x b = x >>= (fun df -> Some (filename_to_list df b)) in
 
+      printf "Reading files: \n%!";
       let train_instances = filename_to_list     train_filename    true   in
       let dev_instances   = filename_to_list_opt dev_filename      false in
       let test_instances  = filename_to_list_opt test_filename     false in
 
       (* collect features on corpus and filter out rare ones *)
-      D.Feature.collect_features_on_corpus ~only_gold:true train_instances;
+      D.Feature.collect_features_on_corpus ~only_gold:true train_instances ~verbose;
       let size = D.Feature.prune_features feature_threshold in
-      Printf.printf "Nb features: %d\n" size;
+      Printf.printf "Nb features: %d\n%!" size;
 
       (* Initialize feature arrays *)
       let best_feature_vector = Array.create ~len:size 0.0 in

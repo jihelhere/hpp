@@ -344,7 +344,7 @@ struct
 
 
   (* let do_read_ordered file = *)
-  let do_read_file file  ~collect_word =
+  let do_read_file file  ~collect_word ~verbose =
     let () = if collect_word
       then collect_word_freq file
     in
@@ -357,14 +357,17 @@ struct
                   ~f:(fun (acc_corpus,acc_sent) line ->
                     if line = ""
                     then
-                      let _ = i := !i + 1 in
-                      let _ = Printf.printf "Loading %d sentences\r%!" !i in
-                      ((List.rev acc_sent)::acc_corpus, [])
+                      begin
+                        i := !i + 1;
+                        if verbose then printf "Loading %d sentences\r%!" !i;
+                        ((List.rev acc_sent)::acc_corpus, [])
+                      end
                     else (acc_corpus, (line_to_conll_token line)::acc_sent))
               )
        )
       )
     in
+    printf "Loading %d sentences\r%!" !i;
     if collect_word
     then
       begin

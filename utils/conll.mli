@@ -27,7 +27,7 @@ sig
     val prepare_sentence_for_decoder : sentence -> t array
     val to_string : t -> string
 
-    val do_read_file : string -> collect_word:bool -> corpus
+    val do_read_file : string -> collect_word:bool -> verbose:bool -> corpus
     val corpus_to_list : corpus -> sentence list
 
 end
