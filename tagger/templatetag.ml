@@ -27,7 +27,7 @@ module Template_Tag =
 
     module C = Conll_Tag
 
-    let nb_hidden_vars = 2
+    let nb_hidden_vars = ref 4
 
     module T = struct
       type t = int with sexp
@@ -266,13 +266,13 @@ module Template_Tag =
       | true -> 1
 
     let combine_pos_lat pos latvar =
-      pos * nb_hidden_vars + latvar
+      pos * !nb_hidden_vars + latvar
 
     let retrieve_pos comb =
-      comb / nb_hidden_vars
+      comb / !nb_hidden_vars
 
     let retrieve_latvar comb =
-      comb mod nb_hidden_vars
+      comb mod !nb_hidden_vars
 
 
 
@@ -304,17 +304,13 @@ module Template_Tag =
       let nnword = C.get_form_id nntok in
 
       fun pos _lat ->
-        (* let pos = combine_pos_lat pos lat in *)
+        (* let pos = combine_pos_lat pos _lat in *)
         0.0
-      +. (fun_score (ft U_Bias pos))
-      +. (fun_score (fwt U_Word word pos))
-      (* +. (fun_score (fwt U_Pref pref pos)) *)
-      (* +. (fun_score (fwt U_Suf suf  pos )) *)
-      +. (fun_score (fwt U_PWord pword pos))
-      (* +. (fun_score (fwt U_PSuf  psuf  pos)) *)
-      +. (fun_score (fwt U_PPWord ppword pos))
-      +. (fun_score (fwt U_NWord nword pos))
-      (* +. (fun_score (fwt U_NSuf  nsuf  pos)) *)
+        +. (fun_score (ft U_Bias pos))
+        +. (fun_score (fwt U_Word word pos))
+        +. (fun_score (fwt U_PWord pword pos))
+        +. (fun_score (fwt U_PPWord ppword pos))
+        +. (fun_score (fwt U_NWord nword pos))
         +. (fun_score (fwt U_NNWord nnword pos))
         +. (fun_score (ftt U_Digit (delta digit) pos))
         +. (fun_score (ftt U_Hyphen (delta hyphen) pos))
@@ -323,10 +319,8 @@ module Template_Tag =
         +. (fun_score (ftt U_AllUpper (delta all_uppercase) pos))
         +. (fun_score (ftt U_Digit_Hyphen_Upper (delta digit_hyphen_upper) pos))
 
-
-
         +. List.foldi pref_list ~init:0.0 ~f:(fun i acc p -> acc +. (fun_score (fwtt U_Pref p i pos)))
-        +. List.foldi suf_list ~init:0.0 ~f:(fun i acc p -> acc +. (fun_score (fwtt U_Suf p i pos)))
+        +. List.foldi suf_list  ~init:0.0 ~f:(fun i acc p -> acc +. (fun_score (fwtt U_Suf  p i pos)))
 
 
     let make_template_bi fun_score _array_sentence _i ppos latvar_ppos pos latvar_pos =
@@ -379,9 +373,9 @@ module Template_Tag =
           (for i = 0 to (Array.length sentence) - 1 do
               let pos = C.prediction (Array.unsafe_get sentence i) in
               let ppos = if i = 0 then start_pos else C.prediction (Array.unsafe_get sentence (i-1)) in
-              for lv = 0 to nb_hidden_vars - 1 do
+              for lv = 0 to !nb_hidden_vars - 1 do
                 let (_: float) = make_template_uni ct sentence i pos lv in
-                for plv = 0 to nb_hidden_vars - 1 do
+                for plv = 0 to !nb_hidden_vars - 1 do
                   let (_: float) = make_template_bi ct sentence i ppos plv pos lv in
                   ()
                 done
@@ -391,8 +385,8 @@ module Template_Tag =
           let stop_pos = C.prediction C.stop in
           let last = Array.length sentence - 1 in
           let last_pos = C.prediction (Array.unsafe_get sentence last) in
-          for lv = 0 to nb_hidden_vars -1 do
-            for plv = 0 to nb_hidden_vars -1 do
+          for lv = 0 to !nb_hidden_vars -1 do
+            for plv = 0 to !nb_hidden_vars -1 do
               let (_: float) = make_template_bi ct sentence (last+1)  last_pos plv stop_pos lv in
               ()
             done;

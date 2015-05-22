@@ -24,6 +24,7 @@ open Modeltag
 open Sequencedecoder
 open Conlltag
 open Evaltag
+open Templatetag
 
 module TS = TrainSelecter(Conll_Tag)(Eval_Tag(Conll_Tag))(Sequence_Decoder)
 
@@ -45,11 +46,12 @@ let train =
       +> flag "-a" (optional_with_default "mira" string) ~doc: "string Trainer name : \"perceptron\" or \"mira\" [default]"
       +> flag "-r" (no_arg) ~doc: " Random initialization of weight vector"
       +> flag "-g" (optional_with_default (-1) int) ~doc: "int Restart from average frequency (negative is never)"
+      +> flag "-h" (optional_with_default (1) int) ~doc: "int Number of latent variables per label"
       +> flag "-v" (no_arg) ~doc: " Verbose mode"
     )
     (fun train_filename dev_filename test_filename
       max_iter feature_threshold model algo
-      random_init restart_freq
+      random_init restart_freq nb_hidden_vars
       verbose () ->
 
         let (module Trainer : OnlineTrainer) =
@@ -58,12 +60,12 @@ let train =
           | Some x -> x
         in
 
-        if verbose then printf "verbose mode\n%!" else printf "not verbose mode\n%!";
+        let () = Template_Tag.nb_hidden_vars := nb_hidden_vars in
 
         Trainer.train ~train_filename ~dev_filename ~test_filename
           ~max_iter ~feature_threshold ~random_init ~restart_freq
           ~verbose
-        |> Model.make
+        |> (fun x -> Model.make x !Template_Tag.nb_hidden_vars)
         |> Model.save ~filename:model
 
     )
@@ -81,8 +83,10 @@ let predict =
   )
     (fun model_fname input_fname output_fname  verbose () ->
 
-     let feature_weights = Model.load model_fname |> Model.get_data in
+     let feature_weights,nb_hidden_vars = Model.load model_fname |> Model.get_data in
      let corpus = Conll_Tag.do_read_file input_fname ~collect_word:false in
+
+     let () = Template_Tag.nb_hidden_vars := nb_hidden_vars in
 
      Sequence_Decoder.decode_corpus
        ~filename:output_fname ~feature_weights ~corpus

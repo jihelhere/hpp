@@ -22,8 +22,8 @@ module Int2StringMap :
   sig
     type t with sexp
     val empty : unit -> t
+    val close : t -> unit
     val str2int : t -> string -> int
-    val str2int_safe : t -> string -> int
     val int2str : t -> int -> string
 
     val get_size : t -> int

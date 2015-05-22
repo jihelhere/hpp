@@ -24,36 +24,40 @@ module Int2StringMap = struct
       int2str : (int,string) Hashtbl.t;
       str2int : (string,int) Hashtbl.t;
       mutable counter : int;
+      mutable closed  : bool;
   }
 
   (* thunk it *)
-  let empty () = {int2str = Hashtbl.create ~hashable:Int.hashable ();
-                  str2int = Hashtbl.create ~hashable:String.hashable ();
-                  counter = 0}
+  let empty () = {
+    int2str = Hashtbl.create ~hashable:Int.hashable ();
+    str2int = Hashtbl.create ~hashable:String.hashable ();
+    counter = 0;
+    closed =  false;
+  }
+
+  let close t = t.closed <- true
+
 
   (* can modify the first argument *)
   let str2int t str =
     match Hashtbl.find t.str2int str with
     | Some x -> x
     | None ->
-       let d = t.counter in
-       let () = t.counter  <- t.counter + 1 in
-       let _ = Hashtbl.add t.int2str ~key: d ~data: str in
-       let _ = Hashtbl.add t.str2int ~key: str ~data: d in
-       d
-
-  (* cannot modify the first argument *)
-  let str2int_safe t str =
-    match Hashtbl.find t.str2int str with
-    | Some x -> x
-    | None -> -1
+       if not t.closed
+       then
+         let d = t.counter in
+         let () = t.counter  <- t.counter + 1 in
+         let _ = Hashtbl.add t.int2str ~key: d ~data: str in
+         let _ = Hashtbl.add t.str2int ~key: str ~data: d in
+         d
+       else
+         -1
 
   (* cannot modify the first argument *)
   let int2str t i =
     match Hashtbl.find t.int2str i with
     | Some x -> x
-    | None -> failwith "Not Found"
-
+    | None ->  failwith "Not Found"        (* TODO:  replace with closed condition*)
 
   let get_size t =
     t.counter

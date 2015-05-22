@@ -41,7 +41,7 @@ struct
 
     (* let () = printf "entering decode\n%!" in *)
     let nb_labels = C.get_number_pos () in
-    let nb_hv = T.nb_hidden_vars in
+    let nb_hv = !T.nb_hidden_vars in
     let n = Array.length sent in
 
     let sent_valid_tags = Array.map sent
@@ -107,7 +107,6 @@ struct
         fill_hyp_scores sent hyp_scores n (i+1)
      in
     fill_hyp_scores sent hyp_scores n 0;
-    (* printf "HERE2\n%!"; *)
 
     (*best path scores*)
     let path_scores = Array.init n
@@ -409,7 +408,7 @@ struct
   (*sent must be pos tagged*)
   let constrained_decode params sent =
     (* let () = printf "entering constrained decode\n%!" in *)
-    let nb_hv = T.nb_hidden_vars in
+    let nb_hv = !T.nb_hidden_vars in
     let n = Array.length sent in
 
     (*build uni/bi scores*)

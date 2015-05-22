@@ -75,7 +75,7 @@ struct
       if len > prefix_length then acc
       else aux str (len+1) ((String.prefix str len)::acc)
     in
-    aux str 1 []
+    List.rev(aux str 1 [])
 
 
   let p_extract_suf str =
@@ -83,7 +83,7 @@ struct
       if len > suffix_length then acc
       else aux str (len+1) ((String.suffix str len)::acc)
     in
-    aux str 1 []
+    List.rev(aux str 1 [])
 
 
 

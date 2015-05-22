@@ -655,10 +655,11 @@ struct
 
   let tokenize_simple gram tokens =
     let word_map = Ckygram.word_map gram in
+    let () = Int2StringMap.close word_map in
     let lex = Ckygram.lexical_index gram in
     List.map tokens
       ~f:(fun str ->
-        match Int2StringMap.str2int_safe word_map str with
+        match Int2StringMap.str2int word_map str with
         | -1 ->
            let unk_id = Int2StringMap.str2int word_map "UNK" in
            (str, unk_id, Array.unsafe_get lex unk_id) (* TODO:  prepare for other jokers *)
@@ -669,6 +670,7 @@ struct
 
   let tokenize_tagged gram tokens =
     let word_map = Ckygram.word_map gram in
+    let () = Int2StringMap.close word_map in
     let nt_map = Ckygram.nt_map gram in
     let lex = Ckygram.lexical_index gram in
     let rec process l =
@@ -677,8 +679,8 @@ struct
       | hw::hp::tl ->
          begin
            let w =
-             match Int2StringMap.str2int_safe word_map hw with
-             | -1 -> Int2StringMap.str2int_safe word_map "UNK" (* TODO:  prepare for other jokers *)
+             match Int2StringMap.str2int word_map hw with
+             | -1 -> Int2StringMap.str2int word_map "UNK" (* TODO:  prepare for other jokers *)
              | n -> n
            in
            let p = Int2StringMap.str2int nt_map hp in

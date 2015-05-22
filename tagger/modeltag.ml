@@ -21,8 +21,11 @@ open Conlltag
 
 module Model =
   struct
-    type t = {weights : float array;
-             }
+    type t =
+      {
+        weights : float array;
+        nb_latvars : int;
+      }
 
 
     let load_corpus sexp =
@@ -64,22 +67,24 @@ module Model =
     let load model =
       let sexp = Sexp.load_sexp model in
       match sexp with
-      | Sexp.List([corpus; template_map; feature_weights;]) ->
+      | Sexp.List([corpus; template_map; feature_weights; Sexp.Atom nbh]) ->
          load_corpus corpus;
          load_template_map template_map;
          let w = load_weights feature_weights in
          let w = normalize_weights w in
          (* Printf.printf "OK: %f\n%!" (compute_norm w); *)
-         {weights = w;}
+         {weights = w; nb_latvars = Int.of_string nbh}
       | _ -> assert(false)
 
 
     let get_weights t = t.weights
-    let get_data t = (t.weights)
+    let get_data t = (t.weights, t.nb_latvars)
 
-    let make weights =
-         {weights = weights;
-         }
+    let make weights nb_latvars =
+      {
+        weights = weights;
+        nb_latvars = nb_latvars
+      }
 
     let save ~filename t =
       let a x = Sexp.Atom x and l x = Sexp.List x in
@@ -90,5 +95,6 @@ module Model =
                              a (Int.to_string (Array.length t.weights));
                              (Array.sexp_of_t Float.sexp_of_t t.weights)
                            ];
+                         a (Int.to_string t.nb_latvars)
                        ])
   end
