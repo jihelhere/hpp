@@ -43,7 +43,7 @@ let train =
       +> flag "-i" (optional_with_default 10 int)  ~doc: "int Iterations"
       +> flag "-n" (optional_with_default 5 int)  ~doc: "int Feature threshold"
       +> flag "-m" (required file) ~doc: "filename Output model name"
-      +> flag "-a" (optional_with_default "mira" string) ~doc: "string Trainer name : \"perceptron\" or \"mira\" [default]"
+      +> flag "-a" (optional_with_default "perceptron" string) ~doc: "string Trainer name : \"perceptron\" or \"mira\" [default]"
       +> flag "-r" (no_arg) ~doc: " Random initialization of weight vector"
       +> flag "-g" (optional_with_default (-1) int) ~doc: "int Restart from average frequency (negative is never)"
       +> flag "-h" (optional_with_default (1) int) ~doc: "int Number of latent variables per label"
