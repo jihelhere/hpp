@@ -90,6 +90,12 @@ let predict =
     )
 
 let command =
+  (* let c = Gc.get () in *)
+  (* let () = fprintf Out_channel.stderr "minor heap size before : %d \n%!" c.minor_heap_size in *)
+  (* let () = Gc.tune ~minor_heap_size:(262144 * 64) () in *)
+  (* let c = Gc.get () in *)
+  (* let () = fprintf Out_channel.stderr "minor heap size after : %d \n%!" c.minor_heap_size in *)
+  (* let () = Gc.tune ~major_heap_increment:(1000448 * 32) () in *)
   Command.group
     ~summary:"A vanilla 1st order dependency parser"
     ~readme:(fun () -> "More detailed information")

@@ -27,7 +27,7 @@ module Template_Tag =
 
     module C = Conll_Tag
 
-    let nb_hidden_vars = 1
+    let nb_hidden_vars = 2
 
     module T = struct
       type t = int with sexp
@@ -116,6 +116,8 @@ module Template_Tag =
       | U_Digit
       | U_Hyphen
       | U_Upper
+      | U_AllUpper
+      | U_Digit_Hyphen_Upper
 
 
     type bi_template_type =
@@ -285,6 +287,9 @@ module Template_Tag =
       let digit = C.has_digit tok in
       let hyphen= C.has_hyphen tok in
       let upper = i > 0 && C.has_uppercase tok in
+      let all_uppercase = C.all_uppercase tok in
+      let digit_hyphen_upper = digit && hyphen && upper in
+
 
       let ptok = if i = 0 then C.start else Array.unsafe_get array_sentence (i-1) in
       let pword = C.get_form_id ptok in
@@ -314,6 +319,11 @@ module Template_Tag =
         +. (fun_score (ftt U_Digit (delta digit) pos))
         +. (fun_score (ftt U_Hyphen (delta hyphen) pos))
         +. (fun_score (ftt U_Upper (delta upper) pos))
+
+        +. (fun_score (ftt U_AllUpper (delta all_uppercase) pos))
+        +. (fun_score (ftt U_Digit_Hyphen_Upper (delta digit_hyphen_upper) pos))
+
+
 
         +. List.foldi pref_list ~init:0.0 ~f:(fun i acc p -> acc +. (fun_score (fwtt U_Pref p i pos)))
         +. List.foldi suf_list ~init:0.0 ~f:(fun i acc p -> acc +. (fun_score (fwtt U_Suf p i pos)))

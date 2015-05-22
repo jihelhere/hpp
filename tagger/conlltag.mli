@@ -69,12 +69,13 @@ module Conll_Tag :
 
     val load_map_from_sexp : Sexp.t -> unit
 
-    val collect_word_tags : unit -> int list array
-    val collect_unk_tags :  unit  -> int list
+    val collect_word_tags : unit -> int array array
+    val collect_unk_tags :  unit  -> int array
 
     val has_hyphen : t -> bool
     val has_digit : t -> bool
     val has_uppercase : t -> bool
+    val all_uppercase : t -> bool
 
     val get_prefix_list : t -> int list
     val get_suffix_list : t -> int list

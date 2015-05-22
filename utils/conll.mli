@@ -30,7 +30,4 @@ sig
     val do_read_file : string -> collect_word:bool -> corpus
     val corpus_to_list : corpus -> sentence list
 
-    val collect_word_tags : unit  -> int list array
-    val collect_unk_tags :  unit  -> int list
-
 end

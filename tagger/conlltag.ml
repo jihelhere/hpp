@@ -33,6 +33,7 @@ struct
       suffix        : int;
       has_digit     : bool;
       has_uppercase : bool;
+      all_uppercase : bool;
       has_hyphen    : bool;
       prefix_list   : int list;
       suffix_list   : int list;
@@ -67,6 +68,7 @@ struct
   let p_has_hyphen t = String.contains t '-'
   let p_has_digit t =  String.exists t ~f:(fun c -> c >= '0' && c <= '9')
   let p_has_uppercase t = not (String.lowercase t = t)
+  let p_all_uppercase t = (String.uppercase t = t)
 
   let p_extract_pref str =
     let rec aux str len acc =
@@ -96,10 +98,11 @@ struct
       suffix = Int2StringMap.str2int suffix_map (get_string_suffix str);
       has_digit = false;
       has_uppercase = false;
+      all_uppercase = false;
       has_hyphen = false;
       prefix_list = List.map (p_extract_pref str) ~f:(fun s -> Int2StringMap.str2int prefix_map s);
       suffix_list = List.map (p_extract_suf str)  ~f:(fun s -> Int2StringMap.str2int suffix_map s);
-              }
+    }
 
   let stop =
     let str = "__STOP__" in
@@ -112,6 +115,7 @@ struct
       suffix = Int2StringMap.str2int suffix_map (get_string_suffix str);
       has_digit = false;
       has_uppercase = false;
+      all_uppercase = false;
       has_hyphen = false;
       prefix_list = List.map (p_extract_pref str) ~f:(fun s -> Int2StringMap.str2int prefix_map s);
       suffix_list = List.map (p_extract_suf str)  ~f:(fun s -> Int2StringMap.str2int suffix_map s);
@@ -128,6 +132,7 @@ struct
       suffix = Int2StringMap.str2int suffix_map (get_string_suffix str);
       has_digit = false;
       has_uppercase = false;
+      all_uppercase = false;
       has_hyphen = false;
       prefix_list = List.map (p_extract_pref str) ~f:(fun s -> Int2StringMap.str2int prefix_map s);
       suffix_list = List.map (p_extract_suf str)  ~f:(fun s -> Int2StringMap.str2int suffix_map s);
@@ -136,8 +141,8 @@ struct
 
   let separator_regex = Regex.create_exn "\t"
   let word_freq = Hashtbl.create ~hashable:String.hashable ()
-  let pruner = ref (Array.empty ())
-  let pos_list = ref []
+  let pruner = ref   (Array.empty ())
+  let pos_list = ref (Array.empty ())
 
   let line_to_conll_token line =
     let lt = Regex.split separator_regex line in
@@ -159,6 +164,7 @@ struct
       suffix = Int2StringMap.str2int suffix_map (get_string_suffix form);
       has_digit = p_has_digit form;
       has_uppercase = p_has_uppercase form;
+      all_uppercase = p_all_uppercase form;
       has_hyphen = p_has_hyphen form;
       prefix_list = List.map (p_extract_pref form) ~f:(fun s -> Int2StringMap.str2int prefix_map s);
       suffix_list = List.map (p_extract_suf form)  ~f:(fun s -> Int2StringMap.str2int suffix_map s);
@@ -237,8 +243,8 @@ struct
         | "prefix_map"   -> Int2StringMap.load_from_sexp prefix_map map
         | "suffix_map"   -> Int2StringMap.load_from_sexp suffix_map map
         | "word_freq"    -> read_hash word_freq map
-        | "pruner"       -> pruner := Array.t_of_sexp (List.t_of_sexp Int.t_of_sexp) map
-        | "pos_list"     -> pos_list :=  List.t_of_sexp Int.t_of_sexp map
+        | "pruner"       -> pruner := Array.t_of_sexp (Array.t_of_sexp Int.t_of_sexp) map
+        | "pos_list"     -> pos_list :=  Array.t_of_sexp Int.t_of_sexp map
         | _ -> assert(false)
        )
     | _ -> assert(false)
@@ -249,8 +255,8 @@ struct
                          ~f: (fun oc ->
                               List.iter corpus
                                         ~f:(fun sent ->
-                                            List.iter
-                                              sent ~f:(fun t -> Printf.fprintf oc "%s\n" (to_string t))
+                                            List.iteri
+                                              sent ~f:(fun i t -> Printf.fprintf oc "%d\t%s\n" (i+1) (to_string t))
                                             ; Printf.fprintf oc "\n"
                                            ); Out_channel.close oc
                              )
@@ -264,8 +270,8 @@ struct
         l [ a "prefix_map" ; Int2StringMap.sexp_of_t prefix_map];
         l [ a "suffix_map" ; Int2StringMap.sexp_of_t suffix_map];
         l [ a "word_freq"  ; Hashtbl.sexp_of_t String.sexp_of_t Int.sexp_of_t word_freq];
-        l [ a "pruner"     ; Array.sexp_of_t (fun l -> List.sexp_of_t Int.sexp_of_t l) !pruner];
-        l [ a "pos_list"   ; List.sexp_of_t Int.sexp_of_t !pos_list]
+        l [ a "pruner"     ; Array.sexp_of_t (fun l -> Array.sexp_of_t Int.sexp_of_t l) !pruner];
+        l [ a "pos_list"   ; Array.sexp_of_t Int.sexp_of_t !pos_list]
       ]
 
   let save_all_string_tables_to_file filename =
@@ -318,8 +324,7 @@ struct
           )
       )
     in
-    Array.replace_all a ~f:(fun l -> List.sort l ~cmp:Int.compare);
-    pruner := a
+    pruner :=  Array.map a ~f:(fun l -> List.sort l ~cmp:Int.compare |> Array.of_list)
 
   let collect_word_tags () = !pruner
 
@@ -332,7 +337,7 @@ struct
     in
     let l = incr (i-1) [] in
     (* List.iter l ~f:(fun e -> printf "%d " e);printf "\n%!"; *)
-    pos_list := l
+    pos_list := Array.of_list l
 
 
   let collect_unk_tags () = !pos_list
@@ -375,6 +380,6 @@ struct
   let has_hyphen t = t.has_hyphen
   let has_digit t =  t.has_digit
   let has_uppercase t = t.has_uppercase
-
+  let all_uppercase t = t.all_uppercase
 
 end
