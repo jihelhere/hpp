@@ -1,5 +1,5 @@
 (*
- * Copyright (C) 2014  Joseph Le Roux
+ * Copyright (C) 2015  Joseph Le Roux
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -53,12 +53,12 @@ struct
       else (print_count := !print_count + 1; false) (* (!print_count mod 100) = 0) *)
     in
       let eval = E.empty in
-      let update_stats ref_sent hyp_sent =
-        E.update eval ref_sent hyp_sent;
-        if print_cond () then Printf.printf "%s\r%!" (E.to_string eval)
+      let update_stats (ref_sentence,_,_) (hyp_sentence,_,_) =
+        E.update eval ~ref_sentence ~hyp_sentence;
+        if print_cond () then fprintf Out_channel.stdout "%s\r%!" (E.to_string eval)
       in
       let reset_stats () = E.reset eval in
-      let final_score () =  Printf.printf "%s\n%!" (E.to_string eval); E.to_score eval |> fst in
+      let final_score () =  fprintf Out_channel.stdout "%s\n%!" (E.to_string eval); E.to_score eval |> fst in
       (update_stats, reset_stats, final_score)
 
     let train_and_eval feature_weights fun_update
@@ -115,7 +115,7 @@ struct
       let open Option.Monad_infix in
       let filename_to_list_opt x b = x >>= (fun df -> Some (filename_to_list df b)) in
 
-      printf "Reading files: \n%!";
+      fprintf Out_channel.stdout "Reading files: \n%!";
       let train_instances = filename_to_list     train_filename    true   in
       let dev_instances   = filename_to_list_opt dev_filename      false in
       let test_instances  = filename_to_list_opt test_filename     false in
@@ -123,17 +123,17 @@ struct
       (* collect features on corpus and filter out rare ones *)
       D.Feature.collect_features_on_corpus ~only_gold:true train_instances ~verbose;
       let size = D.Feature.prune_features feature_threshold in
-      Printf.printf "Nb features: %d\n%!" size;
+      fprintf Out_channel.stdout "Nb features: %d\n%!" size;
 
       (* Initialize feature arrays *)
       let best_feature_vector = Array.create ~len:size 0.0 in
       let updater = U.create ~random_init ~total:(List.length train_instances) ~size in
 
       let rec main_loop train_instances best best_score epoch =
-        if epoch > max_iter then best
+        if epoch > max_iter then (best,best_score)
         else
           let () =
-            Printf.printf("\nIteration: %d\nTraining\n%!") epoch
+            fprintf Out_channel.stdout "\nIteration: %d\nTraining\n%!" epoch
           in
 
           let () = U.init_iteration updater in
@@ -153,7 +153,7 @@ struct
             match dev_instances with
             | None -> 0.0
             | Some dis ->
-               Printf.printf("\nDev:\n%!");
+               fprintf Out_channel.stdout "\nDev:\n%!";
               eval_epoch ~feature_weights: average
                 ~corpus:dis ~verbose
           in
@@ -168,19 +168,20 @@ struct
 
       in
       let train_instances = List.permute train_instances in
-      let final = main_loop train_instances best_feature_vector 0.0 1
+      let final,final_score = main_loop train_instances best_feature_vector 0.0 1
       in
+      fprintf Out_channel.stdout "Best score on Dev: %f\n%!" final_score;
       let () =
         match test_instances with
         | None -> ()
         | Some tis ->
-           Printf.printf("\nTest:\n%!");
+           fprintf Out_channel.stdout "\nTest:\n%!";
            eval_print_epoch ~filename:"test.results" (* TODO give a proper filename *)
              ~feature_weights:final
              ~corpus:tis
              ~verbose
            ;
-           Printf.printf("\n%!")
+           fprintf Out_channel.stdout "\n%!"
       in
       final
   end
@@ -301,7 +302,7 @@ module MiraTrainer (Co : ConllType) (E : Eval with module C = Co) (D : Decoder w
 
 
         (* compute mira update*)
-        let update  t max_iter epoch num (ref_sentence,brfl,rel) (hyp_sentence,hfl,hel) =
+        let update  t max_iter epoch num (ref_sentence,_bfl,_rel) (hyp_sentence,_hfl,_hel) =
           let htbl = Hashtbl.create ~hashable:Int.hashable () in
 
           let opt_oper oper = function
@@ -366,8 +367,6 @@ module MiraTrainer (Co : ConllType) (E : Eval with module C = Co) (D : Decoder w
 
         let average t = Array.copy t.average_weights
         let weights t = t.weights
-
-
 
       end
     include OnlineMarginTrainer(Co)(E)(UpdateOneBestMira)(D)

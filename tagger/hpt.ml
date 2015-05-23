@@ -79,9 +79,10 @@ let predict =
     +> flag "-m" (required file) ~doc: "filename Model file"
     +> flag "-f" (required file) ~doc: "filename Input file  (CONLL format)"
     +> flag "-o" (required file) ~doc: "filename Output file (CONLL format)"
+    +> flag "-e" (no_arg) ~doc: " Evaluation mode"
     +> flag "-v" (no_arg) ~doc: " Verbose mode"
   )
-    (fun model_fname input_fname output_fname  verbose () ->
+    (fun model_fname input_fname output_fname  evaluation verbose () ->
 
      let feature_weights,nb_hidden_vars = Model.load model_fname |> Model.get_data in
      let corpus = Conll_Tag.do_read_file input_fname ~collect_word:false ~verbose in
@@ -90,6 +91,7 @@ let predict =
 
      Sequence_Decoder.decode_corpus
        ~filename:output_fname ~feature_weights ~corpus
+       ~evaluation
        ~verbose
     )
 

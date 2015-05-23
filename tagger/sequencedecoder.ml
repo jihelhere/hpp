@@ -20,7 +20,7 @@ open Conlltag
 open Featuretag
 open Templatetag
 
-(* open Featuretag *)
+open Evaltag
 
 
 
@@ -32,6 +32,7 @@ struct
   module F = Feature_Tag
   module Feature = F
 
+  module E = Eval_Tag(C)
 
 
 
@@ -121,28 +122,28 @@ struct
 
     let rec fill_path_scores i =
 
-      let rec fill_path_scores_left_latent offset leftpos_idx plv lv best_score bestplv =
+      let rec fill_path_scores_left_latent hyp_entry offset leftpos_idx plv lv best_score bestplv =
         if plv >= nb_hv then (best_score,bestplv)
         else
-          let hyp_entry = Array.unsafe_get hyp_scores i in
           let score = Array.unsafe_get hyp_entry (offset + lv * nb_hv + plv) in
           let score = score +. if i > 0
             then Array.unsafe_get (Array.unsafe_get path_scores (i-1)) (leftpos_idx * nb_hv  + plv) else 0.0 in
           if score > best_score
-          then fill_path_scores_left_latent offset leftpos_idx (plv+1) lv score plv
-          else fill_path_scores_left_latent offset leftpos_idx (plv+1) lv best_score bestplv
+          then fill_path_scores_left_latent hyp_entry offset leftpos_idx (plv+1) lv score plv
+          else fill_path_scores_left_latent hyp_entry offset leftpos_idx (plv+1) lv best_score bestplv
       in
 
-      let rec fill_path_scores_current_latent path_score_entry left_valid_pos_list curpos_idx curpos lv =
+      let rec fill_path_scores_current_latent hyp_entry path_score_entry left_valid_pos_list curpos_idx curpos lv =
         if lv >= nb_hv then ()
         else
           let l2 = Array.length left_valid_pos_list in
+          let offset = curpos_idx * l2 in
           let best_score, best_leftpos, best_plv =
             Array.foldi left_valid_pos_list
               ~init:(Float.neg_infinity,-1,-1)
               ~f:(fun leftpos_idx ((best_score,_,_) as acc) leftpos ->
-                let offset = (curpos_idx * l2 + leftpos_idx) * nb_hv * nb_hv in
-                let score, plv = fill_path_scores_left_latent offset leftpos_idx 0 lv Float.neg_infinity (-1) in
+                let offset = (offset + leftpos_idx) * nb_hv * nb_hv in
+                let score, plv = fill_path_scores_left_latent hyp_entry offset leftpos_idx 0 lv Float.neg_infinity (-1) in
                 if score > best_score
                 then (score, leftpos, plv)
                 else acc
@@ -155,15 +156,16 @@ struct
               Array.unsafe_set path_score_entry (curpos_idx * nb_hv + lv) best_score;
               Array.unsafe_set bp (i*nb_labels*nb_hv + curpos * nb_hv + lv) (best_leftpos,best_plv)
             end;
-          fill_path_scores_current_latent path_score_entry left_valid_pos_list curpos_idx curpos (lv+1)
+          fill_path_scores_current_latent hyp_entry path_score_entry left_valid_pos_list curpos_idx curpos (lv+1)
 
       in
 
       let fill_path_scores_current path_score_entry i valid_pos_list =
+        let hyp_entry = Array.unsafe_get hyp_scores i in
         let left_valid_pos_list = get_valid_tags (i-1) in
         Array.iteri valid_pos_list
           ~f:(fun curpos_idx curpos ->
-            fill_path_scores_current_latent path_score_entry left_valid_pos_list curpos_idx curpos 0
+            fill_path_scores_current_latent hyp_entry path_score_entry left_valid_pos_list curpos_idx curpos 0
           )
       in
       if i >= n then ()
@@ -512,22 +514,26 @@ struct
      Array.unsafe_get bp (C.latent_prediction first),
      !bst_lat)
 
-  let decode_corpus ~filename ~feature_weights ~corpus ~verbose =
+  let decode_corpus ~filename ~feature_weights ~corpus ~verbose ~evaluation =
     let decode_func = decode  feature_weights in
     let oc = Out_channel.create filename in
+    let evaluator = E.empty in
     let t1 = Time.now () in
     let () =
       List.iter (C.corpus_to_list corpus)
         ~f:(fun s ->
-          let ref_a = C.prepare_sentence_for_decoder s in
-          let (hyp_a,lat_start,lat_stop) = decode_func ref_a in
-          Array.iter hyp_a ~f:(fun tok -> Printf.fprintf oc "%s\n" (C.to_string tok));
+          let ref_sentence = C.prepare_sentence_for_decoder s in
+          let (hyp_sentence,_,_) = decode_func ref_sentence in
+          if evaluation then E.update evaluator ~ref_sentence ~hyp_sentence;
+          Array.iter hyp_sentence ~f:(fun tok -> Printf.fprintf oc "%s\n" (C.to_string tok));
           fprintf oc "\n"
         ) in
-    let t2 = Time.now () in
     (if verbose
      then
-       printf "Decoding time: %s\n" (Core.Span.to_string (Time.diff t2 t1)));
+        let t2 = Time.now () in
+        printf "Decoding time: %s\n" (Core.Span.to_string (Time.diff t2 t1)));
+    if evaluation
+    then fprintf Out_channel.stdout "%s\n%!" (E.to_string evaluator);
     Out_channel.close oc
 
 
