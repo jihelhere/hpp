@@ -1,3 +1,19 @@
+(*
+ * Copyright (C) 2015  Joseph Le Roux
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *)
 
 open Core.Std
 
@@ -42,6 +58,17 @@ module Feature_Tag = struct
     let lat = C.latent_prediction tok in
     T.fill_hash_table_uni_part  htbl is_valid of_template_valid opt_oper sent i pos lat
 
+  let get_uni_features_start htbl feature_vector_size opt_oper sent lat =
+    let is_valid i = i > 0 && i < feature_vector_size in
+    let tok = C.start in
+    let pos = C.prediction tok in
+    T.fill_hash_table_uni_part  htbl is_valid of_template_valid opt_oper sent 0 pos lat
+
+  let get_uni_features_stop htbl feature_vector_size opt_oper sent lat =
+    let is_valid i = i > 0 && i < feature_vector_size in
+    let tok = C.stop in
+    let pos = C.prediction tok in
+    T.fill_hash_table_uni_part  htbl is_valid of_template_valid opt_oper sent ((Array.length sent)-1) pos lat
 
   let get_bi_features htbl feature_vector_size opt_oper sent i =
     let is_valid i = i > 0 && i < feature_vector_size in
@@ -88,11 +115,14 @@ module Feature_Tag = struct
     then Array.unsafe_get feature_vector idx
     else 0.0
 
-  let get_uni_score feature_vector sent i pos =
-    T.make_template_uni (fun_score feature_vector) sent i pos
+  let get_uni_score feature_vector sent i pos lat =
+    T.make_template_uni (fun_score feature_vector) sent i pos lat
 
-  let get_bi_score feature_vector sent i ppos pos =
-    T.make_template_bi (fun_score feature_vector) sent i ppos pos
+  let get_bi_score feature_vector sent i ppos plat pos lat =
+    T.make_template_bi (fun_score feature_vector) sent i ppos plat pos lat
+
+  let get_tri_score feature_vector sent i pppos pplat ppos plat pos lat =
+    T.make_template_tri (fun_score feature_vector) sent i pppos pplat ppos plat pos lat
 
   let prune_features threshold =
     let () = Printf.printf "feature table contains %d entries\n" (Hashtbl.length T.table_collect_templates) in
@@ -178,8 +208,6 @@ module Feature_Tag = struct
     (*   (if i = (Array.length hyps) -1 *)
     (*    then (get_bi_score params hyps (Array.length hyps) (C.prediction hypp) (C.prediction C.stop)) *)
     (*    else 0.0) *)
-
-
 
 
 

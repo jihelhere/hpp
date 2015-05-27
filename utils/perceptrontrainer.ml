@@ -50,7 +50,7 @@ struct
 
     let print_count = ref 0 in
     let print_cond () = if verbose then true
-      else (print_count := !print_count + 1; false) (* (!print_count mod 100) = 0) *)
+      else (print_count := !print_count + 1; (* false) *) (!print_count mod 100) = 0)
     in
       let eval = E.empty in
       let update_stats (ref_sentence,_,_) (hyp_sentence,_,_) =
@@ -162,9 +162,8 @@ struct
           let train_instances = List.permute train_instances in
           (* made any progress ? *)
           if dev_score >= best_score
-          then main_loop train_instances average
-            dev_score (epoch+1)
-          else main_loop train_instances best best_score (epoch+1)
+          then main_loop train_instances average dev_score  (epoch+1)
+          else main_loop train_instances best    best_score (epoch+1)
 
       in
       let train_instances = List.permute train_instances in

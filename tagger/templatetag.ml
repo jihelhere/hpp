@@ -104,13 +104,25 @@ module Template_Tag =
 
     type uni_template_type =
       | U_Bias (* bias *)
+      | U_BiasLat
       | U_Word (* current word *)
+      | U_WordLat (* current word *)
       | U_Pref (* prefix *)
       | U_Suf (* suffix *)
+      | U_PrefLat
+      | U_SufLat
+
       | U_PWord (* previous word *)
+      | U_PWordLat (* previous word *)
+
       | U_PSuf (* previous suffix *)
+
       | U_PPWord (* previous previous word *)
+      | U_PPWordLat
+
       | U_NWord (* next word *)
+      | U_NWordLat
+
       | U_NSuf (* next suffix *)
       | U_NNWord (* next next word *)
       | U_Digit
@@ -119,9 +131,8 @@ module Template_Tag =
       | U_AllUpper
       | U_Digit_Hyphen_Upper
 
-
-    type bi_template_type =
       | B_Bias (* bias *)
+      | B_BiasLat
       | B_Word (* current word *)
       | B_Pref (* prefix *)
       | B_Suf (* suffix *)
@@ -129,6 +140,8 @@ module Template_Tag =
       (*not really bigram...*)
       | B_PPos (* previous pos alone *)
       | B_PPos_Word (* previous pos + word *)
+
+      | T_Bias (* bias *)
 
     let incr_opt opt =
       match opt with
@@ -140,6 +153,7 @@ module Template_Tag =
 
     let of_template_type  tt =
       ((Obj.magic (Obj.repr tt)) : int)
+
 
     let ft tt tag1 =
       Int.shift_left (of_template_type tt) 56
@@ -278,7 +292,11 @@ module Template_Tag =
 
     let make_template_uni fun_score array_sentence i =
       (* let init = delta (i = 0) in *)
-      let tok = Array.unsafe_get array_sentence i in
+      let l = Array.length array_sentence in
+      let tok = match i with
+        | n when n < 0 -> C.start
+        | n when n >= l -> C.stop
+        | _ -> Array.unsafe_get array_sentence i in
       let word = C.get_form_id tok in
 
       let pref_list = C.get_prefix_list tok in
@@ -291,27 +309,39 @@ module Template_Tag =
       let digit_hyphen_upper = digit && hyphen && upper in
 
 
-      let ptok = if i = 0 then C.start else Array.unsafe_get array_sentence (i-1) in
+      let ptok = if i < 1  then C.start else Array.unsafe_get array_sentence (i-1) in
       let pword = C.get_form_id ptok in
 
       let pptok = if i < 2 then C.start else Array.unsafe_get array_sentence (i-2) in
       let ppword = C.get_form_id pptok in
 
-      let ntok = if i >= (Array.length array_sentence) - 1 then C.stop else Array.unsafe_get array_sentence (i+1) in
+      let ntok = if i >= l - 1 then C.stop else Array.unsafe_get array_sentence (i+1) in
       let nword = C.get_form_id ntok in
 
-      let nntok = if i >= (Array.length array_sentence) - 2 then C.stop else Array.unsafe_get array_sentence (i+2) in
+      let nntok = if i >= l  - 2 then C.stop else Array.unsafe_get array_sentence (i+2) in
       let nnword = C.get_form_id nntok in
 
       fun pos _lat ->
         (* let pos = combine_pos_lat pos _lat in *)
+        let cpos = combine_pos_lat pos _lat in
         0.0
         +. (fun_score (ft U_Bias pos))
+        +. (fun_score (ft U_BiasLat cpos))
+
         +. (fun_score (fwt U_Word word pos))
+        +. (fun_score (fwt U_WordLat word cpos))
+
         +. (fun_score (fwt U_PWord pword pos))
+        +. (fun_score (fwt U_PWordLat pword cpos))
+
         +. (fun_score (fwt U_PPWord ppword pos))
+        +. (fun_score (fwt U_PPWordLat ppword cpos))
+
         +. (fun_score (fwt U_NWord nword pos))
+        +. (fun_score (fwt U_NWordLat nword cpos))
+
         +. (fun_score (fwt U_NNWord nnword pos))
+
         +. (fun_score (ftt U_Digit (delta digit) pos))
         +. (fun_score (ftt U_Hyphen (delta hyphen) pos))
         +. (fun_score (ftt U_Upper (delta upper) pos))
@@ -319,14 +349,24 @@ module Template_Tag =
         +. (fun_score (ftt U_AllUpper (delta all_uppercase) pos))
         +. (fun_score (ftt U_Digit_Hyphen_Upper (delta digit_hyphen_upper) pos))
 
-        +. List.foldi pref_list ~init:0.0 ~f:(fun i acc p -> acc +. (fun_score (fwtt U_Pref p i pos)))
-        +. List.foldi suf_list  ~init:0.0 ~f:(fun i acc p -> acc +. (fun_score (fwtt U_Suf  p i pos)))
+        +. List.foldi pref_list ~init:0.0
+          ~f:(fun i acc p ->
+            acc
+            +. (fun_score (fwtt U_Pref p i pos))
+            (* +. (fun_score (fwtt U_PrefLat p i cpos)) *)
+          )
+        +. List.foldi suf_list  ~init:0.0
+          ~f:(fun i acc p ->
+            acc
+            +. (fun_score (fwtt U_Suf  p i pos))
+            (* +. (fun_score (fwtt U_SufLat  p i cpos)) *)
+          )
 
 
     let make_template_bi fun_score _array_sentence _i ppos latvar_ppos pos latvar_pos =
 
-      let ppos = combine_pos_lat ppos latvar_ppos in
-      let pos  = combine_pos_lat pos latvar_pos in
+      let cppos = combine_pos_lat ppos latvar_ppos in
+      let cpos  = combine_pos_lat pos latvar_pos in
 
       (* let init = delta (i = 0) in *)
       (* let tok = if i >= Array.length array_sentence then C.stop else Array.unsafe_get array_sentence i in *)
@@ -336,6 +376,7 @@ module Template_Tag =
       (* let suf = C.get_suffix_id tok in *)
       0.0
       +. (fun_score (ftt B_Bias ppos pos))
+      +. (fun_score (ftt B_BiasLat cppos cpos))
     (*   +. (fun_score (ft B_PPos ppos)) *)
     (*   +. (fun_score (fwt B_PPos_Word word ppos)) *)
     (*   +. (fun_score (fwtt B_Word word ppos pos)) *)
@@ -347,7 +388,27 @@ module Template_Tag =
       (* +. (fun_score (fwtt B_PPos_Word word ppos init)) *)
       (* +. (fun_score (fwttt B_Word word ppos pos init)) *)
       (* +. (fun_score (fwttt B_Pref pref ppos pos init)) *)
-      (* +. (fun_score (fwttt B_Suf suf  ppos pos init)) *)
+    (* +. (fun_score (fwttt B_Suf suf  ppos pos init)) *)
+
+
+
+
+    let make_template_tri fun_score _array_sentence _i pppos latvar_pppos ppos latvar_ppos pos latvar_pos =
+
+      let cpppos = combine_pos_lat pppos latvar_pppos in
+      let cppos =  combine_pos_lat ppos latvar_ppos in
+      let cpos  =  combine_pos_lat pos latvar_pos in
+
+      (* let init = delta (i = 0) in *)
+      (* let tok = if i >= Array.length array_sentence then C.stop else Array.unsafe_get array_sentence i in *)
+      (* let tok = if C.is_digit tok then C.digit else tok in *)
+      (* let word = C.get_form_id tok in *)
+      (* let pref = C.get_prefix_id tok in *)
+      (* let suf = C.get_suffix_id tok in *)
+      0.0
+      (* +. (fun_score (ftt B_Bias ppos pos)) *)
+      +. (fun_score (fttt T_Bias cpppos cppos cpos))
+
 
     let of_int t = t
 
@@ -370,6 +431,13 @@ module Template_Tag =
       (if only_gold
        then
           let start_pos = C.prediction C.start in
+          for lv = 0 to !nb_hidden_vars - 1 do
+            let (_: float) = make_template_uni ct sentence (-1) start_pos lv in ()
+          done;
+          let stop_pos = C.prediction C.stop in
+          for lv = 0 to !nb_hidden_vars - 1 do
+            let (_: float) = make_template_uni ct sentence (Array.length sentence) stop_pos lv in ()
+          done;
           (for i = 0 to (Array.length sentence) - 1 do
               let pos = C.prediction (Array.unsafe_get sentence i) in
               let ppos = if i = 0 then start_pos else C.prediction (Array.unsafe_get sentence (i-1)) in
@@ -382,7 +450,7 @@ module Template_Tag =
               done;
               ()
            done);
-          let stop_pos = C.prediction C.stop in
+
           let last = Array.length sentence - 1 in
           let last_pos = C.prediction (Array.unsafe_get sentence last) in
           for lv = 0 to !nb_hidden_vars -1 do
