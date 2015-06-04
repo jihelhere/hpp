@@ -25,10 +25,10 @@ sig
   module Feature : Feature with module C = C
 
 
-  val decode : float array -> C.t array -> (C.t array*int*int)
-  val constrained_decode : float array -> C.t array -> (C.t array*int*int)
+  val decode : float array -> C.t array -> C.t array
+  val constrained_decode : float array -> C.t array -> C.t array
   val decode_corpus : filename:string -> feature_weights:float array -> corpus:C.corpus -> verbose:bool -> evaluation:bool -> unit
 
-  val get_feature_differences :  (int, int) Hashtbl.t -> int -> (C.t array*int*int) -> (C.t array*int*int) -> unit
+  val get_feature_differences :  (int, int) Hashtbl.t -> int -> C.t array -> C.t array -> unit
 
 end

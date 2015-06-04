@@ -26,7 +26,7 @@ open Conlltag
 open Evaltag
 open Templatetag
 
-module TS = TrainSelecter(Conll_Tag)(Eval_Tag(Conll_Tag))(Sequence_Decoder)
+module TS = TrainSelecter(Conll_Tag)(Eval_Tag)(Sequence_Decoder)
 
 let train =
 

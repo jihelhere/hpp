@@ -27,7 +27,7 @@ sig
     module C : ConllType
     type t
     val create : random_init:bool -> total:int -> size:int -> t
-    val update :  t -> int -> int -> int -> (C.t array*int*int) ->  (C.t array*int*int)  -> unit
+    val update :  t -> int -> int -> int -> C.t array ->  C.t array  -> unit
     val weights : t -> float array
     val average : t -> float array
 
@@ -53,7 +53,7 @@ struct
       else (print_count := !print_count + 1; (* false) *) (!print_count mod 100) = 0)
     in
       let eval = E.empty in
-      let update_stats (ref_sentence,_,_) (hyp_sentence,_,_) =
+      let update_stats ref_sentence hyp_sentence =
         E.update eval ~ref_sentence ~hyp_sentence;
         if print_cond () then fprintf Out_channel.stdout "%s\r%!" (E.to_string eval)
       in
@@ -93,8 +93,7 @@ struct
       in
       let update_stats_print sentence hypothesis =
         update_stats sentence hypothesis;
-        let (h,_,_) = hypothesis in
-        Array.iter h
+        Array.iter hypothesis
           ~f:(fun tok -> Printf.fprintf oc "%s\n%!" (C.to_string tok));
         Printf.fprintf oc "\n%!"
       in
@@ -301,7 +300,7 @@ module MiraTrainer (Co : ConllType) (E : Eval with module C = Co) (D : Decoder w
 
 
         (* compute mira update*)
-        let update  t max_iter epoch num (ref_sentence,_bfl,_rel) (hyp_sentence,_hfl,_hel) =
+        let update  t max_iter epoch num ref_sentence hyp_sentence =
           let htbl = Hashtbl.create ~hashable:Int.hashable () in
 
           let opt_oper oper = function

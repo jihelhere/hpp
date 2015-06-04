@@ -217,7 +217,8 @@ struct
 
 
   let prepare_sentence_for_decoder sentence =
-    Array.of_list sentence
+    (* TODO:  for trigram ?? *)
+    Array.of_list (start::sentence@[stop])
 
 
   let load_map_from_sexp sexp =
@@ -251,15 +252,18 @@ struct
 
 
   let do_write_file corpus file =
-   Out_channel.with_file file
-                         ~f: (fun oc ->
-                              List.iter corpus
-                                        ~f:(fun sent ->
-                                            List.iteri
-                                              sent ~f:(fun i t -> Printf.fprintf oc "%d\t%s\n" (i+1) (to_string t))
-                                            ; Printf.fprintf oc "\n"
-                                           ); Out_channel.close oc
-                             )
+    Out_channel.with_file file
+      ~f: (fun oc ->
+        List.iter corpus
+          ~f:(fun sent ->
+            (* let sent = List.rev sent in (\* right to left *\) *)
+            List.iteri
+              sent ~f:(fun i t ->
+                if (same_fine_prediction t start) || (same_fine_prediction t stop) then ()
+                else Printf.fprintf oc "%d\t%s\n" (i+1) (to_string t))
+            ; Printf.fprintf oc "\n"
+          ); Out_channel.close oc
+      )
 
 
   let all_string_tables_to_sexp () =
@@ -308,7 +312,7 @@ struct
           )
       )
 
-        let p_collect_word_tags sentences =
+  let p_collect_word_tags sentences =
     let a = Array.init (get_number_form ()) ~f:(fun _ -> []) in
     let () = List.iter sentences
       ~f:(fun sentence ->
@@ -360,7 +364,8 @@ struct
                       begin
                         i := !i + 1;
                         if verbose then printf "Loading %d sentences\r%!" !i;
-                        ((List.rev acc_sent)::acc_corpus, [])
+                      ((List.rev acc_sent)::acc_corpus, [])  (* left to right *)
+                        (* ( (acc_sent)::acc_corpus, []) (\* right to left *\) *)
                       end
                     else (acc_corpus, (line_to_conll_token line)::acc_sent))
               )

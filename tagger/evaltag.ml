@@ -16,7 +16,7 @@
  *)
 
 open Core.Std
-open Conll
+open Conlltag
 
 
 let delta = function
@@ -24,8 +24,8 @@ let delta = function
   | false -> 0
 
 
-module Eval_Tag (C : ConllType) = struct
-  module C = C
+module Eval_Tag = struct
+  module C = Conll_Tag
   type t =
       {
         mutable total_pos   : int;
@@ -50,13 +50,19 @@ module Eval_Tag (C : ConllType) = struct
      (Float.of_int t.exact)        /. (Float.of_int t.instances))
 
 
+  (* deal with trigram ?? *)
   let update t ~ref_sentence ~hyp_sentence =
-    t.total_pos <- t.total_pos + (Array.length ref_sentence);
     let perfect = ref true in
     for i = 0 to (Array.length ref_sentence) - 1 do
-      if(C.same_prediction ref_sentence.(i) hyp_sentence.(i))
-      then t.correct_pos <- t.correct_pos + 1
-      else perfect := false
+      let rtok = (Array.unsafe_get ref_sentence i) in
+      if  (C.same_prediction rtok C.start) || (C.same_prediction rtok C.stop) then ()
+      else
+        begin
+          t.total_pos <- t.total_pos + 1;
+          if(C.same_prediction rtok hyp_sentence.(i))
+          then t.correct_pos <- t.correct_pos + 1
+          else perfect := false
+        end
     done;
     t.instances <- t.instances + 1;
     t.exact     <- t.exact + (delta !perfect)
