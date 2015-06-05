@@ -80,7 +80,6 @@ module Feature_Tag = struct
     let plat = C.latent_prediction ptok in
     T.fill_hash_table_bi_part  htbl is_valid of_template_valid opt_oper sent i ppos plat pos lat
 
-
   let get_bi_features_first htbl feature_vector_size opt_oper sent plat =
     let is_valid i = i > 0 && i < feature_vector_size in
     let first = Array.unsafe_get sent 0 in
@@ -97,6 +96,21 @@ module Feature_Tag = struct
     let ppos = C.prediction last in
     let plat = C.latent_prediction last in
     T.fill_hash_table_bi_part  htbl is_valid of_template_valid opt_oper sent 0 ppos plat pos lat
+
+
+  let get_tri_features htbl feature_vector_size opt_oper sent i =
+    let is_valid i = i > 0 && i < feature_vector_size in
+    let tok = (Array.unsafe_get sent i) in
+    let ptok = (Array.unsafe_get sent (i-1)) in
+    let pptok = (Array.unsafe_get sent (i-2)) in
+    let pos = C.prediction tok in
+    let lat = C.latent_prediction tok  in
+    let ppos = C.prediction ptok  in
+    let plat = C.latent_prediction ptok in
+    let pppos = C.prediction pptok  in
+    let pplat = C.latent_prediction pptok in
+    T.fill_hash_table_tri_part  htbl is_valid of_template_valid opt_oper sent i pppos pplat ppos plat pos lat
+
 
 
   let get_all_features _h _s _o _r _i = failwith "not implemented yet"

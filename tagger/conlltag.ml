@@ -218,8 +218,7 @@ struct
 
   let prepare_sentence_for_decoder sentence =
     (* TODO:  for trigram ?? *)
-    Array.of_list (start::sentence@[stop])
-
+    Array.of_list (start::start::sentence@[stop])
 
   let load_map_from_sexp sexp =
     let read_hash map s =
@@ -313,7 +312,13 @@ struct
       )
 
   let p_collect_word_tags sentences =
-    let a = Array.init (get_number_form ()) ~f:(fun _ -> []) in
+    let a = Array.init (get_number_form ())
+      ~f:(fun id ->
+        if id = start.form then [prediction start]
+        else if id = stop.form then [prediction stop]
+        else [])
+
+    in
     let () = List.iter sentences
       ~f:(fun sentence ->
         List.iter sentence
