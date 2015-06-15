@@ -19,7 +19,6 @@ open Core.Std
 open Int2stringmap
 module Regex = Re2.Regex
 
-
 module Conll_Tag =
 struct
 
@@ -103,6 +102,25 @@ struct
       prefix_list = List.map (p_extract_pref str) ~f:(fun s -> Int2StringMap.str2int prefix_map s);
       suffix_list = List.map (p_extract_suf str)  ~f:(fun s -> Int2StringMap.str2int suffix_map s);
     }
+
+
+  (* let deuz = *)
+  (*   let str = "__DEUZ__" in *)
+  (*   { *)
+  (*     orig_form = str; *)
+  (*     form = Int2StringMap.str2int form_map str; *)
+  (*     pos = Int2StringMap.str2int pos_map str; *)
+  (*     latpos = -1; *)
+  (*     prefix = Int2StringMap.str2int prefix_map (get_string_prefix str); *)
+  (*     suffix = Int2StringMap.str2int suffix_map (get_string_suffix str); *)
+  (*     has_digit = false; *)
+  (*     has_uppercase = false; *)
+  (*     all_uppercase = false; *)
+  (*     has_hyphen = false; *)
+  (*     prefix_list = List.map (p_extract_pref str) ~f:(fun s -> Int2StringMap.str2int prefix_map s); *)
+  (*     suffix_list = List.map (p_extract_suf str)  ~f:(fun s -> Int2StringMap.str2int suffix_map s); *)
+  (*   } *)
+
 
   let stop =
     let str = "__STOP__" in
@@ -214,7 +232,6 @@ struct
 
   let sentence_to_list sentence = sentence
   let list_to_sentence sentence = sentence
-
 
   let prepare_sentence_for_decoder sentence =
     (* TODO:  for trigram ?? *)

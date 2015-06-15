@@ -369,29 +369,8 @@ module Template_Tag =
       let cppos = combine_pos_lat ppos latvar_ppos in
       let cpos  = combine_pos_lat pos latvar_pos in
 
-      (* let init = delta (i = 0) in *)
-      (* let tok = if i >= Array.length array_sentence then C.stop else Array.unsafe_get array_sentence i in *)
-      (* let tok = if C.is_digit tok then C.digit else tok in *)
-      (* let word = C.get_form_id tok in *)
-      (* let pref = C.get_prefix_id tok in *)
-      (* let suf = C.get_suffix_id tok in *)
-      0.0
-      +. (fun_score (ftt B_Bias ppos pos))
+      (fun_score (ftt B_Bias ppos pos))
       +. (fun_score (ftt B_BiasLat cppos cpos))
-    (*   +. (fun_score (ft B_PPos ppos)) *)
-    (*   +. (fun_score (fwt B_PPos_Word word ppos)) *)
-    (*   +. (fun_score (fwtt B_Word word ppos pos)) *)
-    (*   (\* +. (fun_score (fwtt B_Pref pref ppos pos)) *\) *)
-    (* (\* +. (fun_score (fwtt B_Suf suf  ppos pos)) *\) *)
-
-      (* +. (fun_score (fttt B_Bias ppos pos init)) *)
-      (* +. (fun_score (ftt B_PPos ppos init)) *)
-      (* +. (fun_score (fwtt B_PPos_Word word ppos init)) *)
-      (* +. (fun_score (fwttt B_Word word ppos pos init)) *)
-      (* +. (fun_score (fwttt B_Pref pref ppos pos init)) *)
-    (* +. (fun_score (fwttt B_Suf suf  ppos pos init)) *)
-
-
 
 
     let make_template_tri fun_score _array_sentence _i pppos latvar_pppos ppos latvar_ppos pos latvar_pos =
@@ -400,19 +379,8 @@ module Template_Tag =
       let cppos =  combine_pos_lat ppos latvar_ppos in
       let cpos  =  combine_pos_lat pos latvar_pos in
 
-      (* let cpppos = pppos in *)
-      (* let cppos = ppos in *)
-      (* let cpos = pos in *)
-
-
-      (* let init = delta (i = 0) in *)
-      (* let tok = if i >= Array.length array_sentence then C.stop else Array.unsafe_get array_sentence i in *)
-      (* let tok = if C.is_digit tok then C.digit else tok in *)
-      (* let word = C.get_form_id tok in *)
-      (* let pref = C.get_prefix_id tok in *)
-      (* let suf = C.get_suffix_id tok in *)
-      0.0
-      +. (fun_score (fttt T_Bias pppos ppos pos))
+      (* 0.0 *)
+      (fun_score (fttt T_Bias pppos ppos pos))
       +. (fun_score (fttt T_BiasLat cpppos cppos cpos))
 
 
@@ -437,10 +405,13 @@ module Template_Tag =
       (if only_gold
        then
           begin
-            for i = 0 to (Array.length sentence) - 1 do
+            let n = Array.length sentence in
+            for i = 0 to n - 1  do
+              if i < 2 then ()
+              else
               let pos = C.prediction (Array.unsafe_get sentence i) in
               for lv = 0 to !nb_hidden_vars - 1 do
-                let (_: float) = make_template_uni ct sentence i pos lv in
+                let (_: float) = if i = n - 1 then 0.0 else make_template_uni ct sentence i pos lv in
                 if i > 0
                 then
                   begin

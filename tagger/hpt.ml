@@ -43,15 +43,17 @@ let train =
       +> flag "-i" (optional_with_default 10 int)  ~doc: "int Iterations"
       +> flag "-n" (optional_with_default 5 int)  ~doc: "int Feature threshold"
       +> flag "-m" (required file) ~doc: "filename Output model name"
-      +> flag "-a" (optional_with_default "perceptron" string) ~doc: "string Trainer name : \"perceptron\" or \"mira\" [default]"
+      +> flag "-a" (optional_with_default "perceptron" string) ~doc: "string Trainer name : \"perceptron\" [default] or \"mira\""
       +> flag "-r" (no_arg) ~doc: " Random initialization of weight vector"
       +> flag "-g" (optional_with_default (-1) int) ~doc: "int Restart from average frequency (negative is never)"
       +> flag "-h" (optional_with_default (1) int) ~doc: "int Number of latent variables per label"
+      (* +> flag "-l" (optional_with_default true bool) ~doc: "bool left to right reading [default]" *)
       +> flag "-v" (no_arg) ~doc: " Verbose mode"
     )
     (fun train_filename dev_filename test_filename
       max_iter feature_threshold model algo
       random_init restart_freq nb_hidden_vars
+      (* left_to_right *)
       verbose () ->
 
         let (module Trainer : OnlineTrainer) =
@@ -103,7 +105,7 @@ let command =
   (* let () = fprintf Out_channel.stderr "minor heap size after : %d \n%!" c.minor_heap_size in *)
   (* let () = Gc.tune ~major_heap_increment:(1000448 * 32) () in *)
   Command.group
-    ~summary:"A vanilla 1st order dependency parser"
+    ~summary:"A POS tagger based on latent structured perceptron"
     ~readme:(fun () -> "More detailed information")
     [("train",train); ("predict",predict)]
 

@@ -50,9 +50,9 @@ module Eval_Tag = struct
      (Float.of_int t.exact)        /. (Float.of_int t.instances))
 
 
-  (* deal with trigram ?? *)
   let update t ~ref_sentence ~hyp_sentence =
     let perfect = ref true in
+    (* TODO:  iter from 2 to (n-2) ?? *)
     for i = 0 to (Array.length ref_sentence) - 1 do
       let rtok = (Array.unsafe_get ref_sentence i) in
       if  (C.same_prediction rtok C.start) || (C.same_prediction rtok C.stop) then ()

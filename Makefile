@@ -13,11 +13,11 @@ TSOURCES= tagger/hpt.ml tagger/conlltag.ml tagger/conlltag.mli \
 all: hpp.native hpt.native
 
 hpp.native: $(PSOURCES)
-	corebuild -use-menhir -package re2 parser/hpp.native
+	corebuild -cflags -ccopt,-O9 -use-menhir -package re2 parser/hpp.native
 
 
 hpt.native: $(TSOURCES)
-	corebuild -use-menhir -package re2 tagger/hpt.native
+	corebuild -cflags -unsafe,-ccopt,-O9 -package re2 tagger/hpt.native
 
 
 hpp.byte: $(PSOURCES)

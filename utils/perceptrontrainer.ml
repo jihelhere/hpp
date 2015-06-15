@@ -206,7 +206,7 @@ module PerceptronTrainer(Co : ConllType) (E : Eval with module C = Co) (D : Deco
           then
             begin
               for i = 0 to (size/2) - 1 do
-                let f = Random.float 1.0 in
+                let f = Random.float 0.05 in
                 Array.unsafe_set w i f;
                 Array.unsafe_set w (size-i-1) (-.f)
               done;
@@ -222,12 +222,10 @@ module PerceptronTrainer(Co : ConllType) (E : Eval with module C = Co) (D : Deco
           iter_tmp = Array.create ~len:size 0.0;
         }
 
-
       let incr_examples t = t.counter <- t.counter +1
 
       (* compute perceptron update*)
       let update  t _max_iteration _iteration idx_sentence ref_sentence hyp_sentence =
-
 
         let htbl = Hashtbl.create ~hashable:Int.hashable () in
 
@@ -263,8 +261,6 @@ module PerceptronTrainer(Co : ConllType) (E : Eval with module C = Co) (D : Deco
             ~f:(fun i w -> Array.unsafe_set t.model i (w /. (Float.of_int t.counter)))
         else
           ()
-
-
 
       end
 
