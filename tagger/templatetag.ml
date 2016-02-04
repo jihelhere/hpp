@@ -350,38 +350,37 @@ module Template_Tag =
         +. (fun_score (ftt U_AllUpper (delta all_uppercase) pos))
         +. (fun_score (ftt U_Digit_Hyphen_Upper (delta digit_hyphen_upper) pos))
 
-        +. List.foldi pref_list ~init:0.0
-          ~f:(fun i acc p ->
-            acc
-            +. (fun_score (fwtt U_Pref p i pos))
-            (* +. (fun_score (fwtt U_PrefLat p i cpos)) *)
-          )
-        +. List.foldi suf_list  ~init:0.0
-          ~f:(fun i acc p ->
-            acc
-            +. (fun_score (fwtt U_Suf  p i pos))
-            (* +. (fun_score (fwtt U_SufLat  p i cpos)) *)
-          )
+        (* +. List.foldi pref_list ~init:0.0 *)
+        (*   ~f:(fun i acc p -> *)
+        (*     acc *)
+        (*     +. (fun_score (fwtt U_Pref p i pos)) *)
+        (*     (\* +. (fun_score (fwtt U_PrefLat p i cpos)) *\) *)
+        (*   ) *)
+        (* +. List.foldi suf_list  ~init:0.0 *)
+        (*   ~f:(fun i acc p -> *)
+        (*     acc *)
+        (*     +. (fun_score (fwtt U_Suf  p i pos)) *)
+        (*     (\* +. (fun_score (fwtt U_SufLat  p i cpos)) *\) *)
+        (*   ) *)
 
 
     let make_template_bi fun_score _array_sentence _i ppos latvar_ppos pos latvar_pos =
+      0.0
+      (* let cppos = combine_pos_lat ppos latvar_ppos in *)
+      (* let cpos  = combine_pos_lat pos latvar_pos in *)
 
-      let cppos = combine_pos_lat ppos latvar_ppos in
-      let cpos  = combine_pos_lat pos latvar_pos in
-
-      (fun_score (ftt B_Bias ppos pos))
-      +. (fun_score (ftt B_BiasLat cppos cpos))
+      (* (fun_score (ftt B_Bias ppos pos)) *)
+      (* +. (fun_score (ftt B_BiasLat cppos cpos)) *)
 
 
     let make_template_tri fun_score _array_sentence _i pppos latvar_pppos ppos latvar_ppos pos latvar_pos =
+      0.0
+      (* let cpppos = combine_pos_lat pppos latvar_pppos in *)
+      (* let cppos =  combine_pos_lat ppos latvar_ppos in *)
+      (* let cpos  =  combine_pos_lat pos latvar_pos in *)
 
-      let cpppos = combine_pos_lat pppos latvar_pppos in
-      let cppos =  combine_pos_lat ppos latvar_ppos in
-      let cpos  =  combine_pos_lat pos latvar_pos in
-
-      (* 0.0 *)
-      (fun_score (fttt T_Bias pppos ppos pos))
-      +. (fun_score (fttt T_BiasLat cpppos cppos cpos))
+      (* (fun_score (fttt T_Bias pppos ppos pos)) *)
+      (* +. (fun_score (fttt T_BiasLat cpppos cppos cpos)) *)
 
 
     let of_int t = t

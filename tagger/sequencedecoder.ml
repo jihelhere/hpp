@@ -22,205 +22,44 @@ open Templatetag
 
 open Evaltag
 
+(** Sequence Decoder :
+   A Viterbi decoder for trigram labelers
+*)
+
+
 module Sequence_Decoder =
 struct
 
+  (** Access Conll-like data
+  *)
   module C = Conll_Tag
+
+  (** Access feature template extraction
+  *)
   module T = Template_Tag
+
+
+  (** Access feature hash
+  *)
   module F = Feature_Tag
   module Feature = F
 
+
+  (** Access evaluation metrics for tagging
+  *)
   module E = Eval_Tag
 
 
-
-  (* (\* sentence unigram scores aka node scores *\) *)
-  (* let build_uni_scores params sent sent_size nb_hv size_func = *)
-  (*   let uni_scores = Array.init sent_size ~f:(fun i -> *)
-  (*     let s = Array.length (size_func i) in *)
-  (*     Array.create ~len:(nb_hv * s) Float.neg_infinity) *)
-  (*   in *)
-
-  (*   let rec iter_current_latent entry uni_score_fun pos pos_idx lv = *)
-  (*     if lv < 0 then () *)
-  (*     else *)
-  (*       begin *)
-  (*         let uni_score = uni_score_fun pos lv in *)
-  (*         Array.unsafe_set entry (pos_idx * nb_hv + lv) uni_score; *)
-  (*         iter_current_latent entry uni_score_fun pos pos_idx (lv-1) *)
-  (*       end *)
-  (*   in *)
-
-  (*   let rec fill_uni_scores sent uni_scores i = *)
-  (*     if i < 0 then () *)
-  (*     else *)
-  (*       begin *)
-  (*         let uni_score_fun = F.get_uni_score params sent i in *)
-  (*         let valid_pos_list = size_func i in *)
-  (*         let uni_entry = Array.unsafe_get uni_scores i in *)
-  (*         Array.iteri valid_pos_list *)
-  (*           ~f:(fun pos_idx pos -> iter_current_latent uni_entry uni_score_fun pos pos_idx (nb_hv-1)); *)
-  (*         fill_uni_scores sent uni_scores (i-1) *)
-  (*       end *)
-  (*   in *)
-  (*   fill_uni_scores sent uni_scores (sent_size - 1); *)
-  (*   uni_scores *)
-
-
-  (* (\* bigram scores *\) *)
-  (* let build_bi_scores params sent sent_size nb_hv size_func = *)
-  (*   let nb_hv_sq = nb_hv * nb_hv in *)
-  (*   let bi_scores = Array.init sent_size ~f:(fun i -> *)
-  (*     if i = 0 then Array.empty () *)
-  (*     else *)
-  (*       let s1 = Array.length (size_func i) in *)
-  (*       let s2 = Array.length (size_func (i-1)) in *)
-  (*       Array.create ~len:(nb_hv_sq * s1 * s2) Float.neg_infinity) in *)
-
-
-
-  (*   let rec iter_previous_latent hyp_entry offset bi_fun curpos leftpos lv plv = *)
-  (*     if plv < 0 then () *)
-  (*     else *)
-  (*       begin *)
-  (*           (\* printf "plv: %d\n%!" plv; *\) *)
-  (*         let bi_score = bi_fun leftpos plv curpos lv in *)
-  (*         Array.unsafe_set hyp_entry (offset + plv) bi_score; *)
-  (*         iter_previous_latent hyp_entry offset bi_fun curpos leftpos lv (plv - 1) *)
-  (*       end *)
-  (*   in *)
-
-  (*   let iter_previous entry left_valid_pos_list curpos curpos_idx lv bi_fun = *)
-  (*     let l2 = Array.length left_valid_pos_list in *)
-  (*     let offset = curpos_idx * l2 * nb_hv_sq + lv * nb_hv in *)
-  (*     Array.iteri left_valid_pos_list *)
-  (*       ~f:(fun leftpos_idx leftpos -> *)
-  (*         let offset = offset + leftpos_idx * nb_hv_sq in *)
-  (*           (\* printf "leftpos_idx: %d\n%!" leftpos_idx; *\) *)
-  (*         iter_previous_latent entry offset bi_fun curpos leftpos lv (nb_hv -1) *)
-  (*       ) *)
-  (*   in *)
-
-  (*     let rec iter_current_latent entry bi_fun left_valid_pos_list curpos curpos_idx lv = *)
-  (*       if lv < 0 then () *)
-  (*       else *)
-  (*         begin *)
-  (*           (\* printf "curpos_idx: %d\tlv: %d\n%!" curpos_idx lv; *\) *)
-  (*           iter_previous entry left_valid_pos_list curpos curpos_idx lv bi_fun; *)
-  (*           iter_current_latent entry bi_fun left_valid_pos_list curpos curpos_idx (lv-1) *)
-  (*         end *)
-  (*     in *)
-
-  (*   let rec fill_bi_scores sent bi_scores i = *)
-  (*     if i < 1 then () *)
-  (*     else *)
-  (*       begin *)
-  (*         (\* printf "%d\n%!" i; *\) *)
-  (*         let bi_score_fun  = F.get_bi_score params sent i in *)
-  (*         let valid_pos_list = size_func i in *)
-  (*         let left_valid_pos_list = size_func (i-1) in *)
-  (*         let bi_entry = Array.unsafe_get bi_scores i in *)
-  (*         Array.iteri valid_pos_list *)
-  (*           ~f:(fun curpos_idx curpos -> iter_current_latent bi_entry bi_score_fun left_valid_pos_list curpos curpos_idx (nb_hv-1)); *)
-  (*         fill_bi_scores sent bi_scores (i-1) *)
-  (*       end *)
-  (*    in *)
-  (*   fill_bi_scores sent bi_scores (sent_size - 1); *)
-  (*   bi_scores *)
-
-
-  (* (\* trigram scores *\) *)
-  (* let build_tri_scores params sent sent_size nb_hv size_func = *)
-  (*   let nb_hv_sq = nb_hv * nb_hv in *)
-  (*   let nb_hv_cu = nb_hv_sq * nb_hv in *)
-
-  (*   let tri_scores = Array.init sent_size ~f:(fun i -> *)
-  (*     if i < 2 then Array.empty () *)
-  (*     else *)
-  (*       let s1 = Array.length (size_func i)     in *)
-  (*       let s2 = Array.length (size_func (i-1)) in *)
-  (*       let s3 = Array.length (size_func (i-2)) in *)
-  (*       Array.create ~len:(nb_hv_cu * s1 * s2 * s3) *)
-  (*         Float.neg_infinity *)
-  (*         (\* 0.0 *\) *)
-  (*   ) in *)
-
-  (*   let rec iter_previous_previous_latent entry offset tri_fun curpos leftpos leftleftpos lv plv pplv = *)
-  (*     if pplv < 0 then () *)
-  (*     else *)
-  (*       let tri_score = tri_fun leftleftpos pplv leftpos plv curpos lv in *)
-  (*       let () = Array.unsafe_set entry (offset + pplv) tri_score in *)
-  (*       iter_previous_previous_latent entry offset tri_fun curpos leftpos leftleftpos lv plv (pplv-1) *)
-  (*   in *)
-  (*   let iter_previous_previous entry left_left_valid_pos_list offset tri_fun curpos leftpos lv plv = *)
-  (*     let offset = offset + plv * nb_hv in *)
-  (*     Array.iteri left_left_valid_pos_list *)
-  (*       ~f:(fun leftleftpos_idx leftleftpos -> *)
-  (*         let offset = offset + leftleftpos_idx * nb_hv_cu in *)
-  (*         iter_previous_previous_latent entry offset tri_fun curpos leftpos leftleftpos lv plv (nb_hv - 1) *)
-  (*       ) *)
-  (*   in *)
-
-  (*   let rec iter_previous_latent entry left_left_valid_pos_list offset tri_fun curpos leftpos lv plv = *)
-  (*     if plv < 0 then () *)
-  (*     else *)
-  (*       begin *)
-  (*         (\* printf "plv: %d\n%!" plv; *\) *)
-  (*         iter_previous_previous entry left_left_valid_pos_list offset tri_fun curpos leftpos lv plv; *)
-  (*         iter_previous_latent entry left_left_valid_pos_list offset tri_fun curpos leftpos lv (plv - 1) *)
-  (*       end *)
-  (*   in *)
-
-  (*   let iter_previous entry left_left_valid_pos_list left_valid_pos_list curpos curpos_idx lv tri_fun = *)
-  (*     let l2 = Array.length left_valid_pos_list in *)
-  (*     let l3 = Array.length left_left_valid_pos_list in *)
-  (*     let offset = curpos_idx * l2 * l3 * nb_hv_cu + lv * nb_hv_sq in *)
-  (*     Array.iteri left_valid_pos_list *)
-  (*       ~f:(fun leftpos_idx leftpos -> *)
-  (*         let offset = offset + leftpos_idx * l3 * nb_hv_cu in *)
-  (*         iter_previous_latent entry left_left_valid_pos_list offset tri_fun curpos leftpos lv (nb_hv -1) *)
-  (*       ) *)
-  (*   in *)
-
-  (*   let rec iter_current_latent entry tri_fun left_left_valid_pos_list left_valid_pos_list curpos curpos_idx lv = *)
-  (*     if lv < 0 then () *)
-  (*     else *)
-  (*       begin *)
-  (*         iter_previous entry left_left_valid_pos_list left_valid_pos_list curpos curpos_idx lv tri_fun; *)
-  (*         iter_current_latent entry tri_fun left_left_valid_pos_list left_valid_pos_list curpos curpos_idx (lv-1) *)
-  (*       end *)
-  (*   in *)
-
-  (*   let rec fill_tri_scores sent tri_scores i = *)
-  (*     if i < 2 then () *)
-  (*     else *)
-  (*       begin *)
-  (*         let tri_score_fun  = F.get_tri_score params sent i in *)
-  (*         let valid_pos_list = size_func i in *)
-  (*         let left_valid_pos_list = size_func (i-1) in *)
-  (*         let left_left_valid_pos_list = size_func (i-2) in *)
-  (*         let tri_entry = Array.unsafe_get tri_scores i in *)
-  (*         let () = Array.iteri valid_pos_list *)
-  (*           ~f:(fun curpos_idx curpos -> *)
-  (*             iter_current_latent tri_entry tri_score_fun left_left_valid_pos_list left_valid_pos_list curpos curpos_idx (nb_hv-1)) *)
-  (*         in *)
-  (*         fill_tri_scores sent tri_scores (i-1) *)
-  (*       end *)
-  (*    in *)
-  (*   fill_tri_scores sent tri_scores (sent_size - 1); *)
-  (*   tri_scores *)
-
-
-
+  (** The general decoding function
+      @param size_func a function returning an array of authorized tags for a token
+      @param params the weight vector
+      @param sent an array of conll tokens
+  *)
   let decode_general size_func params sent =
 
     (* let () = printf "entering decode\n%!" in *)
     let nb_hv = !T.nb_hidden_vars in
     let n = Array.length sent in
-
-    (* let uni_scores =  build_uni_scores params sent n nb_hv size_func in *)
-    (* let bi_scores =  build_bi_scores params sent n nb_hv size_func in *)
-    (* let tri_scores =  build_tri_scores params sent n nb_hv size_func in *)
 
     let nb_hv_sq = nb_hv * nb_hv in
     let nb_hv_cu = nb_hv_sq * nb_hv in
@@ -243,16 +82,13 @@ struct
       ) in
 
 
-
     (* case i = 0 *)
     (* assume only start at position 0 *)
-
     let () =
       let rec build_path_0 path_entry  lv =
         if lv < 0 then ()
         else
           let offset = lv * nb_hv in
-          (* let uni_score = F.get_uni_score params sent 0 (C.prediction C.start) lv in *)
           let uni_score = 0.0 in
           let current_score = Array.unsafe_get path_entry offset in
           let () =
@@ -271,16 +107,8 @@ struct
       let previous_path_entry = Array.unsafe_get path_scores 0 in
       let valid_pos_current = size_func 1 in
       for curpos_idx = 0 to (Array.length valid_pos_current) - 1 do
-        (* let curpos = Array.unsafe_get valid_pos_current curpos_idx in *)
         for lv = 0 to nb_hv - 1 do
-          (* let uni_score = F.get_uni_score params sent 1 curpos lv in *)
-          let uni_score = 0.0 in
           for plv = 0 to nb_hv -1 do
-            (* let bi_score = F.get_bi_score params sent 1  (C.prediction C.start) plv curpos lv in *)
-            let bi_score = 0.0 in
-
-            (* let score = uni_score +. bi_score *)
-            (*   +. (Array.unsafe_get previous_path_entry (plv * nb_hv)) in *)
 
             let score = 0.0 in
             let offset = curpos_idx * nb_hv_sq + lv * nb_hv + plv in
@@ -304,7 +132,6 @@ struct
         let bp_entry = Array.unsafe_get bp i in
         let previous_path_entry = Array.unsafe_get path_scores (i-1) in
 
-
         let valid_current_pos = size_func i in
         let size_current = Array.length valid_current_pos in
         let valid_left_pos = size_func (i-1) in
@@ -317,6 +144,7 @@ struct
           let current_path_offset = curpos_idx * size_left * nb_hv_sq in
 
           for lv = 0 to nb_hv - 1 do
+            (* no unigram for END token *)
             let uni_score = if i = n - 1 then 0.0 else F.get_uni_score params sent i curpos lv in
 
             let current_path_offset = current_path_offset + lv * nb_hv in
@@ -327,7 +155,6 @@ struct
               let previous_path_offset = leftpos_idx * size_left_left * nb_hv_sq in
 
               for plv = 0 to nb_hv - 1 do
-                (* let bi_score = Array.unsafe_get bi_entry (bi_score_offset + plv) in *)
 
                 let bi_score = F.get_bi_score params sent i leftpos plv curpos lv in
                 let score = uni_score +. bi_score in
@@ -338,7 +165,6 @@ struct
                 for leftleftpos_idx = 0 to size_left_left - 1 do
                   let leftleftpos = Array.unsafe_get valid_left_left_pos leftleftpos_idx in
 
-                  (* let tri_score_offset = tri_score_offset + leftleftpos_idx * nb_hv_sq in *)
                   let previous_path_offset =  previous_path_offset + leftleftpos_idx * nb_hv_sq in
 
                   for pplv = 0 to nb_hv - 1 do
@@ -420,6 +246,11 @@ struct
     output
 
 
+  (** Use POS seen in train to filter search space
+      @param params weight vector
+      @param sent sentence
+
+  *)
   let decode params sent =
     let pruner = C.collect_word_tags () in
     let poslist = C.collect_unk_tags () in
@@ -435,11 +266,25 @@ struct
 
 
   (*sent must be pos tagged*)
+  (** Use goldpos to filter search space
+      @param params weight vector
+      @param sent sentence
+
+  *)
   let constrained_decode params sent =
     let sent_valid_tags = Array.map sent ~f:(fun tok -> [|C.prediction tok|]) in
     let get_valid_tags i = Array.unsafe_get sent_valid_tags i in
     decode_general get_valid_tags params sent
 
+
+  (** Read, parse to file and possibly evaluate a conll file
+      @param filename name of output file
+      @param feature_weights feature weight vector
+      @param corpus the corpus of sentences to read and parse
+      @param verbose verbose mode
+      @param evaluation and eval type instance
+
+  *)
   let decode_corpus ~filename ~feature_weights ~corpus ~verbose ~evaluation =
     let decode_func = decode  feature_weights in
     let oc = Out_channel.create filename in
@@ -470,6 +315,11 @@ struct
     | None -> Some (oper 0 1) (* init: +/- 1 *)
     | Some x -> Some (oper x 1) (* update: x +/- 1 *)
 
+
+
+  (**
+
+  *)
   let get_feature_differences (htbl : (int,int) Hashtbl.t)
       (size : int) ref_sent  hyp_sent =
 
@@ -520,7 +370,4 @@ struct
     let () = loop_on_seq 0 in
 
     ()
-
-
-
 end
