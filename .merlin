@@ -3,3 +3,6 @@ S tagger
 S parser
 S utils
 B _build
+B _build/parser
+B _build/tagger
+B _build/utils

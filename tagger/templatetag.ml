@@ -130,6 +130,12 @@ module Template_Tag =
       | U_Upper
       | U_AllUpper
       | U_Digit_Hyphen_Upper
+      | U_NNWordLat
+      | U_DigitLat
+      | U_HyphenLat
+      | U_UpperLat
+      | U_AllUpperLat
+      | U_Digit_Hyphen_UpperLat
 
       | B_Bias (* bias *)
       | B_BiasLat
@@ -294,14 +300,14 @@ module Template_Tag =
     let make_template_uni fun_score array_sentence i =
       (* let init = delta (i = 0) in *)
       let l = Array.length array_sentence in
-      let tok = match i with
+      let tok = match i with (* TODO:  this matching is useless; padding is performed in conlltag *)
         | n when n < 0 -> C.start
         | n when n >= l -> C.stop
         | _ -> Array.unsafe_get array_sentence i in
       let word = C.get_form_id tok in
 
-      let pref_list = C.get_prefix_list tok in
-      let suf_list =  C.get_suffix_list tok in
+      (* let pref_list = C.get_prefix_list tok in *)
+      (* let suf_list =  C.get_suffix_list tok in *)
 
       let digit = C.has_digit tok in
       let hyphen= C.has_hyphen tok in
@@ -322,31 +328,17 @@ module Template_Tag =
       let nntok = if i >= l  - 2 then C.stop else Array.unsafe_get array_sentence (i+2) in
       let nnword = C.get_form_id nntok in
 
-      fun pos _lat ->
-        (* let pos = combine_pos_lat pos _lat in *)
-        let cpos = combine_pos_lat pos _lat in
+      let uni_obs pos =
         0.0
         +. (fun_score (ft U_Bias pos))
-        +. (fun_score (ft U_BiasLat cpos))
-
         +. (fun_score (fwt U_Word word pos))
-        +. (fun_score (fwt U_WordLat word cpos))
-
         +. (fun_score (fwt U_PWord pword pos))
-        +. (fun_score (fwt U_PWordLat pword cpos))
-
         +. (fun_score (fwt U_PPWord ppword pos))
-        +. (fun_score (fwt U_PPWordLat ppword cpos))
-
         +. (fun_score (fwt U_NWord nword pos))
-        +. (fun_score (fwt U_NWordLat nword cpos))
-
         +. (fun_score (fwt U_NNWord nnword pos))
-
         +. (fun_score (ftt U_Digit (delta digit) pos))
         +. (fun_score (ftt U_Hyphen (delta hyphen) pos))
         +. (fun_score (ftt U_Upper (delta upper) pos))
-
         +. (fun_score (ftt U_AllUpper (delta all_uppercase) pos))
         +. (fun_score (ftt U_Digit_Hyphen_Upper (delta digit_hyphen_upper) pos))
 
@@ -362,26 +354,45 @@ module Template_Tag =
         (*     +. (fun_score (fwtt U_Suf  p i pos)) *)
         (*     (\* +. (fun_score (fwtt U_SufLat  p i cpos)) *\) *)
         (*   ) *)
+      in
+      let uni_lat pos _lat =
+        let cpos = combine_pos_lat pos _lat in
+        0.0
+        +. (fun_score (ft U_BiasLat cpos))
+        +. (fun_score (fwt U_WordLat word cpos))
+        +. (fun_score (fwt U_PWordLat pword cpos))
+        +. (fun_score (fwt U_PPWordLat ppword cpos))
+        +. (fun_score (fwt U_NWordLat nword cpos))
+        +. (fun_score (fwt U_NNWordLat nnword cpos))
+        +. (fun_score (ftt U_DigitLat (delta digit) cpos))
+        +. (fun_score (ftt U_HyphenLat (delta hyphen) cpos))
+        +. (fun_score (ftt U_UpperLat (delta upper) cpos))
+        +. (fun_score (ftt U_AllUpperLat (delta all_uppercase) cpos))
+        +. (fun_score (ftt U_Digit_Hyphen_UpperLat (delta digit_hyphen_upper) cpos))
+      in
+      fun pos _lat -> uni_obs pos +. uni_lat pos _lat
+
 
 
     let make_template_bi fun_score _array_sentence _i ppos latvar_ppos pos latvar_pos =
-      0.0
-      (* let cppos = combine_pos_lat ppos latvar_ppos in *)
-      (* let cpos  = combine_pos_lat pos latvar_pos in *)
 
-      (* (fun_score (ftt B_Bias ppos pos)) *)
-      (* +. (fun_score (ftt B_BiasLat cppos cpos)) *)
-
+      let bi_obs ppos pos =
+        0.0 +. (fun_score (ftt B_Bias ppos pos)) in
+      let bi_lat ppos latvar_ppos pos latvar_pos =
+        let cppos = combine_pos_lat ppos latvar_ppos in
+        let cpos  = combine_pos_lat pos latvar_pos in
+        0.0 +. (fun_score (ftt B_BiasLat cppos cpos)) in
+      bi_obs ppos pos +. bi_lat ppos latvar_ppos pos latvar_pos
 
     let make_template_tri fun_score _array_sentence _i pppos latvar_pppos ppos latvar_ppos pos latvar_pos =
+      (* 0.0 *)
+      let cpppos = combine_pos_lat pppos latvar_pppos in
+      let cppos =  combine_pos_lat ppos latvar_ppos in
+      let cpos  =  combine_pos_lat pos latvar_pos in
+
       0.0
-      (* let cpppos = combine_pos_lat pppos latvar_pppos in *)
-      (* let cppos =  combine_pos_lat ppos latvar_ppos in *)
-      (* let cpos  =  combine_pos_lat pos latvar_pos in *)
-
-      (* (fun_score (fttt T_Bias pppos ppos pos)) *)
+      (* +. (fun_score (fttt T_Bias pppos ppos pos)) *)
       (* +. (fun_score (fttt T_BiasLat cpppos cppos cpos)) *)
-
 
     let of_int t = t
 
@@ -390,10 +401,8 @@ module Template_Tag =
     let collect_template t  =
       Hashtbl.change table_collect_templates t incr_opt
 
-
     let reset_table_collect_template () =
       Hashtbl.clear table_collect_templates
-
 
     let collect_templates ~only_gold sentence =
       let local_table_collect_templates = Table.create () in
@@ -406,11 +415,11 @@ module Template_Tag =
           begin
             let n = Array.length sentence in
             for i = 0 to n - 1  do
-              if i < 2 then ()
+              if i < 0 then ()
               else
               let pos = C.prediction (Array.unsafe_get sentence i) in
               for lv = 0 to !nb_hidden_vars - 1 do
-                let (_: float) = if i = n - 1 then 0.0 else make_template_uni ct sentence i pos lv in
+                let (_: float) = make_template_uni ct sentence i pos lv in
                 if i > 0
                 then
                   begin
@@ -465,5 +474,4 @@ module Template_Tag =
       in
       fun sent i pppos pplat ppos plat pos lat ->
         let _:float = (make_template_tri fun_score sent i pppos pplat ppos plat pos lat) in ()
-
   end

@@ -26,6 +26,7 @@ sig
 
 
   val decode : float array -> C.t array -> C.t array
+  val forced_decode : float array -> C.t array -> C.t array
   val constrained_decode : float array -> C.t array -> C.t array
   val decode_corpus : filename:string -> feature_weights:float array -> corpus:C.corpus -> verbose:bool -> evaluation:bool -> unit
 

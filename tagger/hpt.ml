@@ -62,12 +62,14 @@ let train =
           | Some x -> x
         in
 
+        let () = if verbose then printf "Using algorithm: %s\n" Trainer.name in
+
         let () = Template_Tag.nb_hidden_vars := nb_hidden_vars in
 
         Trainer.train ~train_filename ~dev_filename ~test_filename
           ~max_iter ~feature_threshold ~random_init ~restart_freq
           ~verbose
-        |> (fun x -> Model.make x !Template_Tag.nb_hidden_vars)
+        |> (fun x -> Model.make x !Template_Tag.nb_hidden_vars) (* TODO:  revert argument order *)
         |> Model.save ~filename:model
 
     )

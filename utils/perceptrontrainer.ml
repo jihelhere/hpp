@@ -61,10 +61,10 @@ struct
       let final_score () =  fprintf Out_channel.stdout "%s\n%!" (E.to_string eval); E.to_score eval |> fst in
       (update_stats, reset_stats, final_score)
 
-    let train_and_eval feature_weights fun_update
+    let train_and_eval feature_weights fun_decode fun_ref_decode fun_update
         (fun_eval, fun_reset_eval, final_score) corpus =
-      let my_decoder = D.decode feature_weights in
-      let constrained_decoder = D.constrained_decode feature_weights in
+      let my_decoder = fun_decode feature_weights in
+      let ref_decoder = fun_ref_decode feature_weights in
 
       fun_reset_eval ();
       List.iteri corpus
@@ -72,20 +72,20 @@ struct
           (* let () = Printf.printf "sentence: %d\n%!" i in *)
           let ref_a = C.prepare_sentence_for_decoder s in
           let hyp_a = my_decoder ref_a in
-          let ref_a = constrained_decoder ref_a in
+          let ref_a = ref_decoder ref_a in
           fun_eval ref_a hyp_a;
           fun_update i ref_a hyp_a
         );
       final_score ()
 
 
-    let train_epoch ~update_func ~feature_weights ~corpus ~verbose =
-      train_and_eval feature_weights update_func (eval_task verbose ()) corpus
+    let train_epoch ~decode_func ~update_func ~feature_weights ~corpus ~verbose =
+      train_and_eval feature_weights decode_func D.forced_decode update_func (eval_task verbose ()) corpus
 
     let dont_update_model = fun _ _ _ -> ()
 
     let eval_epoch ~feature_weights ~corpus ~verbose =
-      train_and_eval feature_weights dont_update_model (eval_task verbose ()) corpus
+      train_and_eval feature_weights D.decode D.forced_decode dont_update_model (eval_task verbose ()) corpus
 
     let eval_print_epoch ~filename ~feature_weights ~corpus ~verbose =
       let oc = Out_channel.create filename in
@@ -98,7 +98,7 @@ struct
         Printf.fprintf oc "\n%!"
       in
       (* REMEMBER TO ALWAYS TYPE UNUSED RESULTS -> *)
-      let (_unused_score : float) = train_and_eval feature_weights dont_update_model (update_stats_print, reset_stats, final_score) corpus
+      let (_unused_score : float) = train_and_eval feature_weights D.decode D.forced_decode dont_update_model (update_stats_print, reset_stats, final_score) corpus
       in
       Out_channel.close oc
 
@@ -107,8 +107,6 @@ struct
         ~max_iter ~feature_threshold
         ~random_init ~restart_freq
         ~verbose =
-
-
 
       let filename_to_list x b = x |> C.do_read_file ~collect_word:b ~verbose |> C.corpus_to_list in
       let open Option.Monad_infix in
@@ -131,32 +129,28 @@ struct
       let rec main_loop train_instances best best_score epoch =
         if epoch > max_iter then (best,best_score)
         else
-          let () =
-            fprintf Out_channel.stdout "\nIteration: %d\nTraining\n%!" epoch
-          in
-
+          let () = fprintf Out_channel.stdout "\nIteration: %d\nTraining\n%!" epoch in
           let () = U.init_iteration updater in
 
           let (_ : float) = train_epoch ~verbose
-            ~update_func:(U.update updater max_iter epoch)
-            ~feature_weights:(U.weights updater)
-            ~corpus:train_instances
+              ~decode_func:(if epoch < 5 then D.constrained_decode else D.decode)
+              ~update_func:(U.update updater max_iter epoch)
+              ~feature_weights:(U.weights updater)
+              ~corpus:train_instances
           in
 
 
           let reinit_from_average = (restart_freq > 0) && (epoch mod restart_freq = 0) in
           let () = U.finish_iteration updater reinit_from_average in
-          let average = U.average updater in
+          let average = if reinit_from_average then Array.copy (U.weights updater) else U.average updater in
 
           let dev_score =
             match dev_instances with
             | None -> 0.0
             | Some dis ->
                fprintf Out_channel.stdout "\nDev:\n%!";
-              eval_epoch ~feature_weights: average
-                ~corpus:dis ~verbose
+              eval_epoch ~feature_weights:average ~corpus:dis ~verbose
           in
-
 
           let train_instances = List.permute train_instances in
           (* made any progress ? *)
@@ -184,7 +178,6 @@ struct
       final
   end
 
-
 module PerceptronTrainer(Co : ConllType) (E : Eval with module C = Co) (D : Decoder with module C = Co) =
   struct
 
@@ -204,15 +197,26 @@ module PerceptronTrainer(Co : ConllType) (E : Eval with module C = Co) (D : Deco
         let w = Array.create ~len:size 0.0 in
         let () = if random_init
           then
-            begin
-              for i = 0 to (size/2) - 1 do
-                let f = Random.float 0.05 in
-                Array.unsafe_set w i f;
-                Array.unsafe_set w (size-i-1) (-.f)
-              done;
-              Array.permute w
-            end
-          else ()
+            let rec init i =
+              if i >= (size-1) then ()
+              else
+                begin
+                  let f = Random.float 0.0001 in
+                  Array.unsafe_set w i f;
+                  Array.unsafe_set w (i+1) (-.f);
+                  init (i+2)
+                end
+            in init 0
+
+          (*   begin *)
+          (*     for i = 0 to (size/2) - 1 do *)
+          (*       let f = Random.float 0.05 in *)
+          (*       Array.unsafe_set w i f; *)
+          (*       Array.unsafe_set w (size-i-1) (-.f) *)
+          (*     done; *)
+          (*     Array.permute w *)
+          (*   end *)
+          (* else () *)
         in
         { size = size;
           total = total;

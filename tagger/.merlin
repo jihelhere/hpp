@@ -1,1 +1,5 @@
 REC
+B ../_build/tagger
+B ../_build/parser
+B ../_build/utils
+S ../utils
