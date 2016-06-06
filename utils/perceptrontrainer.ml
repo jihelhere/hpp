@@ -249,7 +249,7 @@ module PerceptronTrainer(Co : ConllType) (E : Eval with module C = Co) (D : Deco
         (* update model *)
         incr_examples t;
 
-        Hashtbl.iter htbl
+        Hashtbl.iteri htbl
           ~f:(fun ~key:fi ~data:count ->
             if count <> 0
             then
@@ -363,7 +363,7 @@ module MiraTrainer (Co : ConllType) (E : Eval with module C = Co) (D : Decoder w
           (* double avgUpdate(double(loop * num_examples - (num_examples * ((iteration + 1) - 1) + (num )) + 1)); *)
           let avgalpha = max_iter * t.examples - (t.examples * (epoch-1) + num) + 1 |> Float.of_int |> ( *. ) alpha in
 
-          Hashtbl.iter htbl
+          Hashtbl.iteri htbl
                        ~f:(fun ~key:fi ~data:count ->
                            if count <> 0
                            then
@@ -412,7 +412,7 @@ module TrainSelecter (C : ConllType) (E : Eval with module C = C) (D : Decoder w
       let known  = String.Table.create () in
       List.iter known_trainers
                 ~f:(fun ((module Q : OnlineTrainer) as q) ->
-                    Hashtbl.replace known ~key:Q.name ~data:q);
+                    Hashtbl.set known ~key:Q.name ~data:q);
       known
 
   end
