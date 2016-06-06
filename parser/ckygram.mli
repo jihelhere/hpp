@@ -31,10 +31,10 @@ type unary_index =  (index list) Array.t
 
 module type Rule_trie =
 sig
-  type info = int * float * float * Rule.t with sexp, compare
-  type t3   = info list with sexp, compare
-  type t2   = (int * t3) list with sexp, compare
-  type t    = (int * t2) list with sexp, compare
+  type info = int * float * float * Rule.t [@@deriving sexp, compare]
+  type t3   = info list [@@deriving sexp, compare]
+  type t2   = (int * t3) list [@@deriving sexp, compare]
+  type t    = (int * t2) list [@@deriving sexp, compare]
 end
 
 module Rule_trie  : Rule_trie

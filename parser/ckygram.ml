@@ -24,18 +24,18 @@ open Rule
   (* all paths have the same length *)
 module type Rule_trie =
 sig
-  type info = int * float * float * Rule.t with sexp, compare
-  type t3   = info list with sexp, compare
-  type t2   = (int * t3) list with sexp, compare
-  type t    = (int * t2) list with sexp, compare
+  type info = int * float * float * Rule.t [@@deriving sexp, compare]
+  type t3   = info list [@@deriving sexp, compare]
+  type t2   = (int * t3) list [@@deriving sexp, compare]
+  type t    = (int * t2) list [@@deriving sexp, compare]
 end
 
 module Rule_trie =
-  struct
-    type info = int * float * float * Rule.t with sexp, compare
-    type t3   = info list with sexp, compare
-    type t2   = (int * t3) list with sexp, compare
-    type t    = (int * t2) list with sexp, compare
+struct
+    type info = int * float * float * Rule.t [@@deriving sexp, compare]
+    type t3   = info list [@@deriving sexp, compare]
+    type t2   = (int * t3) list [@@deriving sexp, compare]
+    type t    = (int * t2) list [@@deriving sexp, compare]
 
     let (empty : t) = []
 
@@ -152,7 +152,7 @@ module Rule_trie =
   let initialize nt_map w_map rules p =
 
     let gram = empty nt_map w_map in
-    let () = Hashtbl.merge_into ~src:p ~dst: gram.priors ~f:(fun ~key: _ d _ -> Some d)
+    let () = Hashtbl.merge_into ~src:p ~dst: gram.priors ~f:(fun ~key: _ d _ -> Set_to d)
     in
 
     let poslist = Hashtbl.fold rules ~init:[] ~f:(fun ~key:rule ~data:_ poslist ->
@@ -161,7 +161,7 @@ module Rule_trie =
       | _ -> poslist) in
 
 
-    Hashtbl.iter rules
+    Hashtbl.iteri rules
       ~f:(fun ~key:rule ~data:prob ->
         match rule with
         | Rule.Lex(p,w) -> gram.lex.(w) <- (p,prob,log prob,rule)::gram.lex.(w)

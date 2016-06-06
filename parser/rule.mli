@@ -22,7 +22,7 @@ module Rule : sig
   type t =
     | Bin of int * int * int
     | Una of int * int * int list
-    | Lex of int * int with sexp, compare
+    | Lex of int * int [@@deriving sexp, compare]
   val create_pcfg : Ptbtree.int_tree list -> (int,float) Hashtbl.t * (t,float) Hashtbl.t
   val priors_of_sexp : Sexp.t -> (int,float) Hashtbl.t
   val gram_of_sexp : Sexp.t -> (t,float) Hashtbl.t

@@ -163,8 +163,8 @@ struct
   let pos_list = ref (Array.empty ())
 
   let line_to_conll_token line =
-    let lt = Regex.split separator_regex line in
-    (* let lt = String.split line ~on:'\t' in *)
+    (* let lt = Regex.split separator_regex line in *)
+    let lt = String.split line ~on:'\t' in
     let get_field n = match (List.nth lt n) with
       | None -> failwith "missing field"
       | (Some v) -> v

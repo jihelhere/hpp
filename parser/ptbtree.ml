@@ -15,8 +15,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *)
 
-open Core.Std
 module Regex = Re2.Regex
+open Core.Std
 open Tree
 
 module Ptbtree =
@@ -117,7 +117,7 @@ struct
       let y = yield t in
       List.iter ~f:(fun w ->
         Hashtbl.change tbl w
-          (function
+          ~f:(function
           | Some x -> Some(x+1)
           | None -> Some 1
           )

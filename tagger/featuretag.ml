@@ -52,26 +52,26 @@ module Feature_Tag = struct
     t < feature_vector_size
 
   let get_uni_features htbl feature_vector_size opt_oper sent i =
-    let is_valid i = i > 0 && i < feature_vector_size in
-    let tok = (Array.unsafe_get sent i) in
+    let is_valid idx = idx >= 0 && idx < feature_vector_size in
+    let tok = Array.unsafe_get sent i in
     let pos = C.prediction tok in
     let lat = C.latent_prediction tok in
     T.fill_hash_table_uni_part  htbl is_valid of_template_valid opt_oper sent i pos lat
 
-  let get_uni_features_start htbl feature_vector_size opt_oper sent lat =
-    let is_valid i = i > 0 && i < feature_vector_size in
-    let tok = C.start in
-    let pos = C.prediction tok in
-    T.fill_hash_table_uni_part  htbl is_valid of_template_valid opt_oper sent 0 pos lat
+  (* let get_uni_features_start htbl feature_vector_size opt_oper sent lat = *)
+  (*   let is_valid i = i > 0 && i < feature_vector_size in *)
+  (*   let tok = C.start in *)
+  (*   let pos = C.prediction tok in *)
+  (*   T.fill_hash_table_uni_part  htbl is_valid of_template_valid opt_oper sent 0 pos lat *)
 
-  let get_uni_features_stop htbl feature_vector_size opt_oper sent lat =
-    let is_valid i = i > 0 && i < feature_vector_size in
-    let tok = C.stop in
-    let pos = C.prediction tok in
-    T.fill_hash_table_uni_part  htbl is_valid of_template_valid opt_oper sent ((Array.length sent)-1) pos lat
+  (* let get_uni_features_stop htbl feature_vector_size opt_oper sent lat = *)
+  (*   let is_valid i = i > 0 && i < feature_vector_size in *)
+  (*   let tok = C.stop in *)
+  (*   let pos = C.prediction tok in *)
+  (*   T.fill_hash_table_uni_part  htbl is_valid of_template_valid opt_oper sent ((Array.length sent)-1) pos lat *)
 
   let get_bi_features htbl feature_vector_size opt_oper sent i =
-    let is_valid i = i > 0 && i < feature_vector_size in
+    let is_valid i = i >= 0 && i < feature_vector_size in
     let tok = (Array.unsafe_get sent i) in
     let ptok = (Array.unsafe_get sent (i-1)) in
     let pos = C.prediction tok in
@@ -80,26 +80,26 @@ module Feature_Tag = struct
     let plat = C.latent_prediction ptok in
     T.fill_hash_table_bi_part  htbl is_valid of_template_valid opt_oper sent i ppos plat pos lat
 
-  let get_bi_features_first htbl feature_vector_size opt_oper sent plat =
-    let is_valid i = i > 0 && i < feature_vector_size in
-    let first = Array.unsafe_get sent 0 in
-    let pos = C.prediction first in
-    let lat = C.latent_prediction first in
-    let ppos = C.prediction C.start in
-    T.fill_hash_table_bi_part  htbl is_valid of_template_valid opt_oper sent 0 ppos plat pos lat
+  (* let get_bi_features_first htbl feature_vector_size opt_oper sent plat = *)
+  (*   let is_valid i = i >= 0 && i < feature_vector_size in *)
+  (*   let first = Array.unsafe_get sent 0 in *)
+  (*   let pos = C.prediction first in *)
+  (*   let lat = C.latent_prediction first in *)
+  (*   let ppos = C.prediction C.start in *)
+  (*   T.fill_hash_table_bi_part  htbl is_valid of_template_valid opt_oper sent 0 ppos plat pos lat *)
 
 
-  let get_bi_features_stop htbl feature_vector_size opt_oper sent lat =
-    let is_valid i = i > 0 && i < feature_vector_size in
-    let pos = C.prediction C.stop in
-    let last = Array.unsafe_get sent ((Array.length sent)-1) in
-    let ppos = C.prediction last in
-    let plat = C.latent_prediction last in
-    T.fill_hash_table_bi_part  htbl is_valid of_template_valid opt_oper sent 0 ppos plat pos lat
+  (* let get_bi_features_stop htbl feature_vector_size opt_oper sent lat = *)
+  (*   let is_valid i = i > 0 && i < feature_vector_size in *)
+  (*   let pos = C.prediction C.stop in *)
+  (*   let last = Array.unsafe_get sent ((Array.length sent)-1) in *)
+  (*   let ppos = C.prediction last in *)
+  (*   let plat = C.latent_prediction last in *)
+  (*   T.fill_hash_table_bi_part  htbl is_valid of_template_valid opt_oper sent 0 ppos plat pos lat *)
 
 
   let get_tri_features htbl feature_vector_size opt_oper sent i =
-    let is_valid i = i > 0 && i < feature_vector_size in
+    let is_valid i = i >= 0 && i < feature_vector_size in
     let tok = Array.unsafe_get sent i in
     let ptok = Array.unsafe_get sent (i-1) in
     let pptok = Array.unsafe_get sent (i-2) in

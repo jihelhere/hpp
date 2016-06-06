@@ -23,7 +23,7 @@ module Rule : sig
   type t =
     | Bin of int * int * int
     | Una of int * int * int list
-    | Lex of int * int with sexp, compare
+    | Lex of int * int [@@deriving sexp, compare]
 
   val create_pcfg : Ptbtree.int_tree list -> (int,float) Hashtbl.t * (t,float) Hashtbl.t
   val priors_of_sexp : Sexp.t -> (int,float) Hashtbl.t
@@ -37,7 +37,7 @@ end = struct
       | Bin of int * int * int
       | Una of int * int * int list
       | Lex of int * int
-    with sexp, compare
+      [@@deriving sexp, compare]
 
     let hash t =
       match t with
@@ -136,9 +136,9 @@ end = struct
     in
     let () =
       List.iter ~f:(fun rule ->
-        let () = Hashtbl.change rule_counts rule incr_count in
+        let () = Hashtbl.change rule_counts rule ~f:incr_count in
         let lhs = get_lhs rule in
-        let () = Hashtbl.change lhs_counts lhs incr_count in ()
+        let () = Hashtbl.change lhs_counts lhs ~f:incr_count in ()
       ) lrules
     in
     let total_nts = Hashtbl.fold ~f:(fun ~key:_ ~data:i acc -> i + acc) ~init:0 lhs_counts |> Float.of_int in

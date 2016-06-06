@@ -1,3 +1,4 @@
+
 (*
  * Copyright (C) 2014  Joseph Le Roux
  *
@@ -20,7 +21,7 @@ open Sexp
 
 module Int2StringMap :
   sig
-    type t with sexp
+    type t [@@deriving sexp]
     val empty : unit -> t
     val close : t -> unit
     val str2int : t -> string -> int

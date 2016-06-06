@@ -80,12 +80,12 @@ struct
 
 
     let train_epoch ~decode_func ~update_func ~feature_weights ~corpus ~verbose =
-      train_and_eval feature_weights decode_func D.forced_decode update_func (eval_task verbose ()) corpus
+      train_and_eval feature_weights (decode_func) (D.forced_decode) update_func (eval_task verbose ()) corpus
 
     let dont_update_model = fun _ _ _ -> ()
 
     let eval_epoch ~feature_weights ~corpus ~verbose =
-      train_and_eval feature_weights D.decode D.forced_decode dont_update_model (eval_task verbose ()) corpus
+      train_and_eval feature_weights (D.decode) (D.forced_decode) dont_update_model (eval_task verbose ()) corpus
 
     let eval_print_epoch ~filename ~feature_weights ~corpus ~verbose =
       let oc = Out_channel.create filename in
@@ -98,7 +98,7 @@ struct
         Printf.fprintf oc "\n%!"
       in
       (* REMEMBER TO ALWAYS TYPE UNUSED RESULTS -> *)
-      let (_unused_score : float) = train_and_eval feature_weights D.decode D.forced_decode dont_update_model (update_stats_print, reset_stats, final_score) corpus
+      let (_unused_score : float) = train_and_eval feature_weights (D.decode) (D.forced_decode) dont_update_model (update_stats_print, reset_stats, final_score) corpus
       in
       Out_channel.close oc
 
@@ -127,20 +127,29 @@ struct
       let updater = U.create ~random_init ~total:(List.length train_instances) ~size in
 
       let rec main_loop train_instances best best_score epoch =
-        if epoch > max_iter then (best,best_score)
+        if epoch >= max_iter then (best,best_score)
         else
           let () = fprintf Out_channel.stdout "\nIteration: %d\nTraining\n%!" epoch in
           let () = U.init_iteration updater in
 
           let (_ : float) = train_epoch ~verbose
-              ~decode_func:(if epoch < 5 then D.constrained_decode else D.decode)
+              ~decode_func:
+                (* D.decode *)
+                (match epoch with
+                 (* | n when n mod 40 = 10 -> D.constrained_decode *)
+                 (* | n when n mod 40 = 11 -> D.constrained_decode *)
+                 (* | n when n mod 20 = 4 -> D.constrained_decode *)
+                 (* | n when n mod 20 < 2 -> D.constrained_decode *)
+                 | _ -> D.decode
+                )
+                (* (if epoch < 5 then D.constrained_decode else D.decode) *)
               ~update_func:(U.update updater max_iter epoch)
               ~feature_weights:(U.weights updater)
               ~corpus:train_instances
           in
 
 
-          let reinit_from_average = (restart_freq > 0) && (epoch mod restart_freq = 0) in
+          let reinit_from_average = (epoch > 0) && (restart_freq > 0) && (epoch mod restart_freq = 0) in
           let () = U.finish_iteration updater reinit_from_average in
           let average = if reinit_from_average then Array.copy (U.weights updater) else U.average updater in
 
@@ -160,7 +169,7 @@ struct
 
       in
       let train_instances = List.permute train_instances in
-      let final,final_score = main_loop train_instances best_feature_vector 0.0 1
+      let final,final_score = main_loop train_instances best_feature_vector Float.neg_infinity 0
       in
       fprintf Out_channel.stdout "Best score on Dev: %f\n%!" final_score;
       let () =
@@ -201,10 +210,12 @@ module PerceptronTrainer(Co : ConllType) (E : Eval with module C = Co) (D : Deco
               if i >= (size-1) then ()
               else
                 begin
-                  let f = Random.float 0.0001 in
+                  let s = Random.bool () in
+                  let f = Random.float 1.0 in
+                  let f = if s then f else (-.f) in
                   Array.unsafe_set w i f;
-                  Array.unsafe_set w (i+1) (-.f);
-                  init (i+2)
+                  (* Array.unsafe_set w (i+1) (-.f); *)
+                  init (i+1)
                 end
             in init 0
 
@@ -242,8 +253,9 @@ module PerceptronTrainer(Co : ConllType) (E : Eval with module C = Co) (D : Deco
           ~f:(fun ~key:fi ~data:count ->
             if count <> 0
             then
-              (t.model.(fi)    <- t.model.(fi)    +. (Float.of_int count);
-               t.iter_tmp.(fi) <- t.iter_tmp.(fi) +. (Float.of_int ((t.total - idx_sentence) * count))
+              (
+                t.model.(fi)    <- t.model.(fi)    +. (Float.of_int count);
+                t.iter_tmp.(fi) <- t.iter_tmp.(fi) +. (Float.of_int ((t.total - idx_sentence) * count))
               )
           )
 
@@ -257,15 +269,12 @@ module PerceptronTrainer(Co : ConllType) (E : Eval with module C = Co) (D : Deco
           ~f:(fun i w -> Array.unsafe_set t.iter_tmp i ((Float.of_int t.total) *. w))
 
       let finish_iteration t reinit_from_average =
-        Array.iteri t.iter_tmp
-          ~f:(fun i w -> Array.replace t.sum i ~f:(fun v -> v +. w));
+        Array.iteri t.iter_tmp ~f:(fun i w -> Array.replace t.sum i ~f:(fun v -> v +. w));
         if reinit_from_average
         then
-          Array.iteri t.sum
-            ~f:(fun i w -> Array.unsafe_set t.model i (w /. (Float.of_int t.counter)))
+          Array.iteri t.sum ~f:(fun i w -> Array.unsafe_set t.model i (w /. (Float.of_int t.counter)))
         else
           ()
-
       end
 
     include OnlineMarginTrainer(Co)(E)(UpdatePerceptron)(D)

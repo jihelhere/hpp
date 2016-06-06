@@ -30,7 +30,7 @@ module Template_Tag =
     let nb_hidden_vars = ref 4
 
     module T = struct
-      type t = int with sexp
+      type t = int [@@deriving sexp]
 
       let compare = Int.compare
 
@@ -100,7 +100,7 @@ module Template_Tag =
     include Comparable.Make(T)
     include Hashable.Make(T)
 
-    type t = T.t with sexp
+    type t = T.t [@@deriving sexp]
 
     type uni_template_type =
       | U_Bias (* bias *)
@@ -169,47 +169,47 @@ module Template_Tag =
     let ftt tt tag1 tag2 =
       Int.shift_left (of_template_type tt) 56
       |> Int.bit_or tag1
-      |> Int.bit_or (Int.shift_left tag2 8)
+      |> Int.bit_or (Int.shift_left tag2 10)
 
     let fttt tt tag1 tag2 tag3 =
       Int.shift_left (of_template_type tt) 56
       |> Int.bit_or tag1
-      |> Int.bit_or (Int.shift_left tag2 8)
-      |> Int.bit_or (Int.shift_left tag3 16)
+      |> Int.bit_or (Int.shift_left tag2 10)
+      |> Int.bit_or (Int.shift_left tag3 20)
 
-    let ftttt tt tag1 tag2 tag3 tag4 =
-      Int.shift_left (of_template_type tt) 56
-      |> Int.bit_or tag1
-      |> Int.bit_or (Int.shift_left tag2 8)
-      |> Int.bit_or (Int.shift_left tag3 16)
-      |> Int.bit_or (Int.shift_left tag4 24)
+    (* let ftttt tt tag1 tag2 tag3 tag4 = *)
+    (*   Int.shift_left (of_template_type tt) 56 *)
+    (*   |> Int.bit_or tag1 *)
+    (*   |> Int.bit_or (Int.shift_left tag2 8) *)
+    (*   |> Int.bit_or (Int.shift_left tag3 16) *)
+    (*   |> Int.bit_or (Int.shift_left tag4 24) *)
 
-    let fttttt tt tag1 tag2 tag3 tag4 tag5 =
-      Int.shift_left (of_template_type tt) 56
-      |> Int.bit_or tag1
-      |> Int.bit_or (Int.shift_left tag2 8)
-      |> Int.bit_or (Int.shift_left tag3 16)
-      |> Int.bit_or (Int.shift_left tag4 24)
-      |> Int.bit_or (Int.shift_left tag5 32)
+    (* let fttttt tt tag1 tag2 tag3 tag4 tag5 = *)
+    (*   Int.shift_left (of_template_type tt) 56 *)
+    (*   |> Int.bit_or tag1 *)
+    (*   |> Int.bit_or (Int.shift_left tag2 8) *)
+    (*   |> Int.bit_or (Int.shift_left tag3 16) *)
+    (*   |> Int.bit_or (Int.shift_left tag4 24) *)
+    (*   |> Int.bit_or (Int.shift_left tag5 32) *)
 
-    let ftttttt tt tag1 tag2 tag3 tag4 tag5 tag6 =
-      Int.shift_left (of_template_type tt) 56
-      |> Int.bit_or tag1
-      |> Int.bit_or (Int.shift_left tag2 8)
-      |> Int.bit_or (Int.shift_left tag3 16)
-      |> Int.bit_or (Int.shift_left tag4 24)
-      |> Int.bit_or (Int.shift_left tag5 32)
-      |> Int.bit_or (Int.shift_left tag6 40)
+    (* let ftttttt tt tag1 tag2 tag3 tag4 tag5 tag6 = *)
+    (*   Int.shift_left (of_template_type tt) 56 *)
+    (*   |> Int.bit_or tag1 *)
+    (*   |> Int.bit_or (Int.shift_left tag2 8) *)
+    (*   |> Int.bit_or (Int.shift_left tag3 16) *)
+    (*   |> Int.bit_or (Int.shift_left tag4 24) *)
+    (*   |> Int.bit_or (Int.shift_left tag5 32) *)
+    (*   |> Int.bit_or (Int.shift_left tag6 40) *)
 
-    let fttttttt tt tag1 tag2 tag3 tag4 tag5 tag6 tag7 =
-      Int.shift_left (of_template_type tt) 56
-      |> Int.bit_or tag1
-      |> Int.bit_or (Int.shift_left tag2 8)
-      |> Int.bit_or (Int.shift_left tag3 16)
-      |> Int.bit_or (Int.shift_left tag4 24)
-      |> Int.bit_or (Int.shift_left tag5 32)
-      |> Int.bit_or (Int.shift_left tag6 40)
-      |> Int.bit_or (Int.shift_left tag7 48)
+    (* let fttttttt tt tag1 tag2 tag3 tag4 tag5 tag6 tag7 = *)
+    (*   Int.shift_left (of_template_type tt) 56 *)
+    (*   |> Int.bit_or tag1 *)
+    (*   |> Int.bit_or (Int.shift_left tag2 8) *)
+    (*   |> Int.bit_or (Int.shift_left tag3 16) *)
+    (*   |> Int.bit_or (Int.shift_left tag4 24) *)
+    (*   |> Int.bit_or (Int.shift_left tag5 32) *)
+    (*   |> Int.bit_or (Int.shift_left tag6 40) *)
+    (*   |> Int.bit_or (Int.shift_left tag7 48) *)
 
     (* assume less than 2^16 words *)
 
@@ -237,14 +237,14 @@ module Template_Tag =
       Int.shift_left (of_template_type tt) 56
       |> Int.bit_or word1
       |> Int.bit_or (Int.shift_left tag1 16)
-      |> Int.bit_or (Int.shift_left tag2 24)
+      |> Int.bit_or (Int.shift_left tag2 26)
 
     let fwttt tt word1 tag1 tag2 tag3 =
       Int.shift_left (of_template_type tt) 56
       |> Int.bit_or word1
       |> Int.bit_or (Int.shift_left tag1 16)
-      |> Int.bit_or (Int.shift_left tag2 24)
-      |> Int.bit_or (Int.shift_left tag3 32)
+      |> Int.bit_or (Int.shift_left tag2 26)
+      |> Int.bit_or (Int.shift_left tag3 36)
 
     (* let fwtttt tt word1 tag1 tag2 tag3 tag4 = *)
     (*   Int.shift_left (of_template_type tt) 56 *)
@@ -265,15 +265,15 @@ module Template_Tag =
       |> Int.bit_or word1
       |> Int.bit_or (Int.shift_left word2 16)
       |> Int.bit_or (Int.shift_left tag1 32)
-      |> Int.bit_or (Int.shift_left tag2 40)
+      |> Int.bit_or (Int.shift_left tag2 42)
 
-    let fwwttt tt word1 word2 tag1 tag2 tag3 =
-      Int.shift_left (of_template_type tt) 56
-      |> Int.bit_or word1
-      |> Int.bit_or (Int.shift_left word2 16)
-      |> Int.bit_or (Int.shift_left tag1 32)
-      |> Int.bit_or (Int.shift_left tag2 40)
-      |> Int.bit_or (Int.shift_left tag3 48)
+    (* let fwwttt tt word1 word2 tag1 tag2 tag3 = *)
+    (*   Int.shift_left (of_template_type tt) 56 *)
+    (*   |> Int.bit_or word1 *)
+    (*   |> Int.bit_or (Int.shift_left word2 16) *)
+    (*   |> Int.bit_or (Int.shift_left tag1 32) *)
+    (*   |> Int.bit_or (Int.shift_left tag2 40) *)
+    (*   |> Int.bit_or (Int.shift_left tag3 48) *)
 
     (* let fwwwt tt word1 word2 word3 tag1 = *)
     (*   Int.shift_left (of_template_type tt) 56 *)
@@ -300,14 +300,14 @@ module Template_Tag =
     let make_template_uni fun_score array_sentence i =
       (* let init = delta (i = 0) in *)
       let l = Array.length array_sentence in
-      let tok = match i with (* TODO:  this matching is useless; padding is performed in conlltag *)
-        | n when n < 0 -> C.start
-        | n when n >= l -> C.stop
-        | _ -> Array.unsafe_get array_sentence i in
+      let tok = (* match i with (\* TODO:  this matching is useless; padding is performed in conlltag *\) *)
+        (* | n when n < 0 -> C.start *)
+        (* | n when n >= l -> C.stop *)
+        (* | _ ->  *) Array.unsafe_get array_sentence i in
       let word = C.get_form_id tok in
 
-      (* let pref_list = C.get_prefix_list tok in *)
-      (* let suf_list =  C.get_suffix_list tok in *)
+      let pref_list = C.get_prefix_list tok in
+      let suf_list =  C.get_suffix_list tok in
 
       let digit = C.has_digit tok in
       let hyphen= C.has_hyphen tok in
@@ -342,21 +342,19 @@ module Template_Tag =
         +. (fun_score (ftt U_AllUpper (delta all_uppercase) pos))
         +. (fun_score (ftt U_Digit_Hyphen_Upper (delta digit_hyphen_upper) pos))
 
-        (* +. List.foldi pref_list ~init:0.0 *)
-        (*   ~f:(fun i acc p -> *)
-        (*     acc *)
-        (*     +. (fun_score (fwtt U_Pref p i pos)) *)
-        (*     (\* +. (fun_score (fwtt U_PrefLat p i cpos)) *\) *)
-        (*   ) *)
-        (* +. List.foldi suf_list  ~init:0.0 *)
-        (*   ~f:(fun i acc p -> *)
-        (*     acc *)
-        (*     +. (fun_score (fwtt U_Suf  p i pos)) *)
-        (*     (\* +. (fun_score (fwtt U_SufLat  p i cpos)) *\) *)
-        (*   ) *)
+        +. List.foldi pref_list ~init:0.0
+          ~f:(fun i acc p ->
+            acc
+            +. (fun_score (fwtt U_Pref p i pos))
+          )
+        +. List.foldi suf_list  ~init:0.0
+          ~f:(fun i acc p ->
+            acc
+            +. (fun_score (fwtt U_Suf  p i pos))
+          )
       in
-      let uni_lat pos _lat =
-        let cpos = combine_pos_lat pos _lat in
+      let uni_lat pos lat =
+        let cpos = combine_pos_lat pos lat in
         0.0
         +. (fun_score (ft U_BiasLat cpos))
         +. (fun_score (fwt U_WordLat word cpos))
@@ -365,17 +363,28 @@ module Template_Tag =
         +. (fun_score (fwt U_NWordLat nword cpos))
         +. (fun_score (fwt U_NNWordLat nnword cpos))
         +. (fun_score (ftt U_DigitLat (delta digit) cpos))
+
         +. (fun_score (ftt U_HyphenLat (delta hyphen) cpos))
         +. (fun_score (ftt U_UpperLat (delta upper) cpos))
         +. (fun_score (ftt U_AllUpperLat (delta all_uppercase) cpos))
         +. (fun_score (ftt U_Digit_Hyphen_UpperLat (delta digit_hyphen_upper) cpos))
+
+        +. List.foldi pref_list ~init:0.0
+          ~f:(fun i acc p ->
+            acc
+            +. (fun_score (fwtt U_PrefLat p i cpos))
+          )
+        +. List.foldi suf_list  ~init:0.0
+          ~f:(fun i acc p ->
+            acc
+            +. (fun_score (fwtt U_SufLat  p i cpos))
+          )
       in
       fun pos _lat -> uni_obs pos +. uni_lat pos _lat
 
 
 
     let make_template_bi fun_score _array_sentence _i ppos latvar_ppos pos latvar_pos =
-
       let bi_obs ppos pos =
         0.0 +. (fun_score (ftt B_Bias ppos pos)) in
       let bi_lat ppos latvar_ppos pos latvar_pos =
@@ -391,15 +400,15 @@ module Template_Tag =
       let cpos  =  combine_pos_lat pos latvar_pos in
 
       0.0
-      (* +. (fun_score (fttt T_Bias pppos ppos pos)) *)
-      (* +. (fun_score (fttt T_BiasLat cpppos cppos cpos)) *)
+      +. (fun_score (fttt T_Bias pppos ppos pos))
+      +. (fun_score (fttt T_BiasLat cpppos cppos cpos))
 
     let of_int t = t
 
     let table_collect_templates = Table.create ()
 
     let collect_template t  =
-      Hashtbl.change table_collect_templates t incr_opt
+      Hashtbl.change table_collect_templates t ~f:incr_opt
 
     let reset_table_collect_template () =
       Hashtbl.clear table_collect_templates
@@ -407,7 +416,7 @@ module Template_Tag =
     let collect_templates ~only_gold sentence =
       let local_table_collect_templates = Table.create () in
       let ct t =
-        Hashtbl.change local_table_collect_templates t incr_opt;
+        Hashtbl.change local_table_collect_templates t ~f:incr_opt;
         0.0
       in
       (if only_gold
@@ -415,8 +424,6 @@ module Template_Tag =
           begin
             let n = Array.length sentence in
             for i = 0 to n - 1  do
-              if i < 0 then ()
-              else
               let pos = C.prediction (Array.unsafe_get sentence i) in
               for lv = 0 to !nb_hidden_vars - 1 do
                 let (_: float) = make_template_uni ct sentence i pos lv in
@@ -444,13 +451,13 @@ module Template_Tag =
         failwith "Not implemented yet"
   )
       ;
-      Hashtbl.iter local_table_collect_templates
+      Hashtbl.iteri local_table_collect_templates
         ~f:(fun ~key:k ~data:_ -> collect_template k)
 
     let fill_hash_table_uni_part  htbl is_valid template_to_index_fun oper =
       let fun_score t =
         let idx = (template_to_index_fun t) in
-        let () = (if is_valid idx then  Hashtbl.change htbl (template_to_index_fun t) oper)
+        let () = (if is_valid idx then  Hashtbl.change htbl (template_to_index_fun t) ~f:oper)
         in 0.0
       in
       fun sent i pos lat ->
@@ -459,7 +466,7 @@ module Template_Tag =
     let fill_hash_table_bi_part  htbl is_valid template_to_index_fun oper =
       let fun_score t =
         let idx = (template_to_index_fun t) in
-        let () = (if is_valid idx then  Hashtbl.change htbl (template_to_index_fun t) oper)
+        let () = (if is_valid idx then  Hashtbl.change htbl (template_to_index_fun t) ~f:oper)
         in 0.0
       in
       fun sent i ppos plat pos lat ->
@@ -469,7 +476,7 @@ module Template_Tag =
     let fill_hash_table_tri_part  htbl is_valid template_to_index_fun oper =
       let fun_score t =
         let idx = (template_to_index_fun t) in
-        let () = (if is_valid idx then  Hashtbl.change htbl (template_to_index_fun t) oper)
+        let () = (if is_valid idx then  Hashtbl.change htbl (template_to_index_fun t) ~f:oper)
         in 0.0
       in
       fun sent i pppos pplat ppos plat pos lat ->
