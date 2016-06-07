@@ -55,8 +55,7 @@ module Feature_Tag = struct
     let is_valid idx = idx >= 0 && idx < feature_vector_size in
     let tok = Array.unsafe_get sent i in
     let pos = C.prediction tok in
-    let lat = C.latent_prediction tok in
-    T.fill_hash_table_uni_part  htbl is_valid of_template_valid opt_oper sent i pos lat
+    T.fill_hash_table_uni_part  htbl is_valid of_template_valid opt_oper sent i pos
 
   (* let get_uni_features_start htbl feature_vector_size opt_oper sent lat = *)
   (*   let is_valid i = i > 0 && i < feature_vector_size in *)
@@ -75,10 +74,8 @@ module Feature_Tag = struct
     let tok = (Array.unsafe_get sent i) in
     let ptok = (Array.unsafe_get sent (i-1)) in
     let pos = C.prediction tok in
-    let lat = C.latent_prediction tok  in
     let ppos = C.prediction ptok  in
-    let plat = C.latent_prediction ptok in
-    T.fill_hash_table_bi_part  htbl is_valid of_template_valid opt_oper sent i ppos plat pos lat
+    T.fill_hash_table_bi_part  htbl is_valid of_template_valid opt_oper sent i ppos pos
 
   (* let get_bi_features_first htbl feature_vector_size opt_oper sent plat = *)
   (*   let is_valid i = i >= 0 && i < feature_vector_size in *)
@@ -104,12 +101,9 @@ module Feature_Tag = struct
     let ptok = Array.unsafe_get sent (i-1) in
     let pptok = Array.unsafe_get sent (i-2) in
     let pos = C.prediction tok in
-    let lat = C.latent_prediction tok  in
     let ppos = C.prediction ptok  in
-    let plat = C.latent_prediction ptok in
     let pppos = C.prediction pptok  in
-    let pplat = C.latent_prediction pptok in
-    T.fill_hash_table_tri_part  htbl is_valid of_template_valid opt_oper sent i pppos pplat ppos plat pos lat
+    T.fill_hash_table_tri_part  htbl is_valid of_template_valid opt_oper sent i pppos ppos pos
 
 
   let get_all_features _h _s _o _r _i = failwith "not implemented yet"
@@ -128,14 +122,14 @@ module Feature_Tag = struct
     then Array.unsafe_get feature_vector idx
     else 0.0
 
-  let get_uni_score feature_vector sent i pos lat =
-    T.make_template_uni (fun_score feature_vector) sent i pos lat
+  let get_uni_score feature_vector sent i pos =
+    T.make_template_uni (fun_score feature_vector) sent i pos
 
-  let get_bi_score feature_vector sent i ppos plat pos lat =
-    T.make_template_bi (fun_score feature_vector) sent i ppos plat pos lat
+  let get_bi_score feature_vector sent i ppos pos =
+    T.make_template_bi (fun_score feature_vector) sent i ppos pos
 
-  let get_tri_score feature_vector sent i pppos pplat ppos plat pos lat =
-    T.make_template_tri (fun_score feature_vector) sent i pppos pplat ppos plat pos lat
+  let get_tri_score feature_vector sent i pppos ppos pos =
+    T.make_template_tri (fun_score feature_vector) sent i pppos ppos pos
 
   let prune_features threshold =
     let () = Printf.printf "feature table contains %d entries\n" (Hashtbl.length T.table_collect_templates) in

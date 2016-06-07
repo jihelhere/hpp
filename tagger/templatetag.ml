@@ -297,7 +297,7 @@ module Template_Tag =
 
 
 
-    let make_template_uni fun_score array_sentence i =
+    let make_template_uni fun_score array_sentence i pos =
       (* let init = delta (i = 0) in *)
       let l = Array.length array_sentence in
       let tok = (* match i with (\* TODO:  this matching is useless; padding is performed in conlltag *\) *)
@@ -328,9 +328,7 @@ module Template_Tag =
       let nntok = if i >= l  - 2 then C.stop else Array.unsafe_get array_sentence (i+2) in
       let nnword = C.get_form_id nntok in
 
-      let uni_obs pos =
-        0.0
-        +. (fun_score (ft U_Bias pos))
+      (fun_score (ft U_Bias pos))
         +. (fun_score (fwt U_Word word pos))
         +. (fun_score (fwt U_PWord pword pos))
         +. (fun_score (fwt U_PPWord ppword pos))
@@ -352,56 +350,14 @@ module Template_Tag =
             acc
             +. (fun_score (fwtt U_Suf  p i pos))
           )
-      in
-      let uni_lat pos lat =
-        let cpos = combine_pos_lat pos lat in
-        0.0
-        +. (fun_score (ft U_BiasLat cpos))
-        +. (fun_score (fwt U_WordLat word cpos))
-        +. (fun_score (fwt U_PWordLat pword cpos))
-        +. (fun_score (fwt U_PPWordLat ppword cpos))
-        +. (fun_score (fwt U_NWordLat nword cpos))
-        +. (fun_score (fwt U_NNWordLat nnword cpos))
-        +. (fun_score (ftt U_DigitLat (delta digit) cpos))
-
-        +. (fun_score (ftt U_HyphenLat (delta hyphen) cpos))
-        +. (fun_score (ftt U_UpperLat (delta upper) cpos))
-        +. (fun_score (ftt U_AllUpperLat (delta all_uppercase) cpos))
-        +. (fun_score (ftt U_Digit_Hyphen_UpperLat (delta digit_hyphen_upper) cpos))
-
-        +. List.foldi pref_list ~init:0.0
-          ~f:(fun i acc p ->
-            acc
-            +. (fun_score (fwtt U_PrefLat p i cpos))
-          )
-        +. List.foldi suf_list  ~init:0.0
-          ~f:(fun i acc p ->
-            acc
-            +. (fun_score (fwtt U_SufLat  p i cpos))
-          )
-      in
-      fun pos _lat -> uni_obs pos +. uni_lat pos _lat
 
 
 
-    let make_template_bi fun_score _array_sentence _i ppos latvar_ppos pos latvar_pos =
-      let bi_obs ppos pos =
-        0.0 +. (fun_score (ftt B_Bias ppos pos)) in
-      let bi_lat ppos latvar_ppos pos latvar_pos =
-        let cppos = combine_pos_lat ppos latvar_ppos in
-        let cpos  = combine_pos_lat pos latvar_pos in
-        0.0 +. (fun_score (ftt B_BiasLat cppos cpos)) in
-      bi_obs ppos pos +. bi_lat ppos latvar_ppos pos latvar_pos
+    let make_template_bi fun_score _array_sentence _i ppos pos =
+      (fun_score (ftt B_Bias ppos pos))
 
-    let make_template_tri fun_score _array_sentence _i pppos latvar_pppos ppos latvar_ppos pos latvar_pos =
-      (* 0.0 *)
-      let cpppos = combine_pos_lat pppos latvar_pppos in
-      let cppos =  combine_pos_lat ppos latvar_ppos in
-      let cpos  =  combine_pos_lat pos latvar_pos in
-
-      0.0
-      +. (fun_score (fttt T_Bias pppos ppos pos))
-      +. (fun_score (fttt T_BiasLat cpppos cppos cpos))
+    let make_template_tri fun_score _array_sentence _i pppos ppos pos =
+      (fun_score (fttt T_Bias pppos ppos pos))
 
     let of_int t = t
 
@@ -425,31 +381,24 @@ module Template_Tag =
             let n = Array.length sentence in
             for i = 0 to n - 1  do
               let pos = C.prediction (Array.unsafe_get sentence i) in
-              for lv = 0 to !nb_hidden_vars - 1 do
-                let (_: float) = make_template_uni ct sentence i pos lv in
-                if i > 0
-                then
-                  begin
-                    let ppos = C.prediction (Array.unsafe_get sentence (i-1)) in
-                    for plv = 0 to !nb_hidden_vars - 1 do
-                      let (_: float) = make_template_bi ct sentence i ppos plv pos lv in
-                      if i > 1
-                      then
-                        let pppos = C.prediction (Array.unsafe_get sentence (i-2)) in
-                        for pplv = 0 to !nb_hidden_vars - 1 do
-                          let (_: float) = make_template_tri ct sentence i pppos pplv ppos plv pos lv in
-                          ()
-                        done;
-                    done;
+              let (_: float) = make_template_uni ct sentence i pos in
+              if i > 0
+              then
+                begin
+                  let ppos = C.prediction (Array.unsafe_get sentence (i-1)) in
+                  let (_: float) = make_template_bi ct sentence i ppos pos in
+                  if i > 1
+                  then
+                    let pppos = C.prediction (Array.unsafe_get sentence (i-2)) in
+                    let (_: float) = make_template_tri ct sentence i pppos ppos pos in
                     ()
-                  end
-              done;
-              ()
-            done
+                end
+            done;
+            ()
           end
        else
         failwith "Not implemented yet"
-  )
+      )
       ;
       Hashtbl.iteri local_table_collect_templates
         ~f:(fun ~key:k ~data:_ -> collect_template k)
@@ -460,8 +409,8 @@ module Template_Tag =
         let () = (if is_valid idx then  Hashtbl.change htbl (template_to_index_fun t) ~f:oper)
         in 0.0
       in
-      fun sent i pos lat ->
-        let _:float = (make_template_uni fun_score sent i pos lat) in ()
+      fun sent i pos ->
+        let _:float = (make_template_uni fun_score sent i pos) in ()
 
     let fill_hash_table_bi_part  htbl is_valid template_to_index_fun oper =
       let fun_score t =
@@ -469,8 +418,8 @@ module Template_Tag =
         let () = (if is_valid idx then  Hashtbl.change htbl (template_to_index_fun t) ~f:oper)
         in 0.0
       in
-      fun sent i ppos plat pos lat ->
-        let _:float = (make_template_bi fun_score sent i ppos plat pos lat) in ()
+      fun sent i ppos pos ->
+        let _:float = (make_template_bi fun_score sent i ppos pos) in ()
 
 
     let fill_hash_table_tri_part  htbl is_valid template_to_index_fun oper =
@@ -479,6 +428,6 @@ module Template_Tag =
         let () = (if is_valid idx then  Hashtbl.change htbl (template_to_index_fun t) ~f:oper)
         in 0.0
       in
-      fun sent i pppos pplat ppos plat pos lat ->
-        let _:float = (make_template_tri fun_score sent i pppos pplat ppos plat pos lat) in ()
+      fun sent i pppos ppos pos ->
+        let _:float = (make_template_tri fun_score sent i pppos ppos pos) in ()
   end
